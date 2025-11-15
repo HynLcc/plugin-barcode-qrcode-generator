@@ -116,6 +116,15 @@ interface BarcodeConfig {
   flat: boolean;
 }
 
+// 转换结果接口
+interface IConversionResult {
+  recordId: string;
+  urlCount: number;
+  successCount: number;
+  failedUrls: string[];
+  errors: string[];
+}
+
 export function SimpleLinkConverter() {
   const { t } = useTranslation('common');
   const { tableId } = useGlobalUrlParams();
@@ -387,6 +396,20 @@ export function SimpleLinkConverter() {
     return <A className="w-4 h-4" />; // 默认图标
   }, []);
 
+  // 更新统计信息的辅助函数
+  const updateStats = useCallback((type: 'success' | 'failed', increment: number = 1) => {
+    setStats(prev => {
+      const newStats = { ...prev };
+      if (type === 'success') {
+        newStats.success += increment;
+      } else {
+        newStats.failed += increment;
+      }
+      newStats.processing -= increment;
+      return newStats;
+    });
+  }, []);
+
   // 生成条码并上传的转换方法
   const handleBarcodeConvert = async () => {
     if (!isConfigValid) {
@@ -452,9 +475,10 @@ export function SimpleLinkConverter() {
         return;
       }
 
-      const results: any[] = [];
+      const results: IConversionResult[] = [];
       const totalRecords = records.length;
       let totalItems = 0;
+      let successCount = 0; // 使用局部变量跟踪成功数量
 
       for (let i = 0; i < records.length; i++) {
         const record = records[i];
@@ -469,7 +493,9 @@ export function SimpleLinkConverter() {
         }
 
         totalItems += 1;
-        const result: any = {
+        setStats(prev => ({ ...prev, processing: prev.processing + 1 }));
+        
+        const result: IConversionResult = {
           recordId: record.id,
           urlCount: 1, // 对于条码，每个记录生成一个条码
           successCount: 0,
@@ -513,43 +539,24 @@ export function SimpleLinkConverter() {
 
             if (uploadResponse.data) {
               result.successCount = 1;
-              setStats(prev => {
-                const newStats = { ...prev };
-                newStats.success += 1;
-                newStats.processing -= 1;
-                return newStats;
-              });
+              successCount += 1;
+              updateStats('success');
             } else {
               result.failedUrls.push(text);
               result.errors.push('Upload failed: No response data');
               console.error(`记录 ${record.id} 上传失败: 无响应数据`);
-              setStats(prev => {
-                const newStats = { ...prev };
-                newStats.failed += 1;
-                newStats.processing -= 1;
-                return newStats;
-              });
+              updateStats('failed');
             }
           } else {
             result.failedUrls.push(text);
             result.errors.push(barcodeResult.error || 'Barcode generation failed');
-            setStats(prev => {
-              const newStats = { ...prev };
-              newStats.failed += 1;
-              newStats.processing -= 1;
-              return newStats;
-            });
+            updateStats('failed');
           }
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           result.failedUrls.push(text);
           result.errors.push(errorMessage);
-          setStats(prev => {
-            const newStats = { ...prev };
-            newStats.failed += 1;
-            newStats.processing -= 1;
-            return newStats;
-          });
+          updateStats('failed');
         }
 
         if (result.urlCount > 0) {
@@ -559,9 +566,9 @@ export function SimpleLinkConverter() {
         setProgress(((i + 1) / totalRecords) * 100);
       }
 
-      // 显示成功消息
+      // 显示成功消息（使用局部变量successCount而不是stats.success）
       toast.success(t('converter.conversionCompleted'), {
-        description: t('converter.barcodesGenerated', { total: totalItems, success: stats.success })
+        description: t('converter.barcodesGenerated', { total: totalItems, success: successCount })
       });
 
     } catch (error) {
