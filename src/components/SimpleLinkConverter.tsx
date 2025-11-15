@@ -39,6 +39,54 @@ import { IView } from '@/types';
 // 必填标记组件
 export const RequireCom = () => <span className="mr-0.5 text-red-500">*</span>;
 
+// 根据条码格式获取示例文本
+const getPreviewTextByFormat = (format: BarcodeFormat): string => {
+  switch (format) {
+    case BarcodeFormat.CODE128:
+      return 'Hello123';
+    case BarcodeFormat.CODE128A:
+      return 'ABC123';
+    case BarcodeFormat.CODE128B:
+      return 'Hello';
+    case BarcodeFormat.CODE128C:
+      return '123456';
+    case BarcodeFormat.CODE39:
+      return 'ABC123';
+    case BarcodeFormat.EAN13:
+      return '5901234123457';
+    case BarcodeFormat.EAN8:
+      return '96385074';
+    case BarcodeFormat.EAN5:
+      return '12345';
+    case BarcodeFormat.EAN2:
+      return '53';
+    case BarcodeFormat.UPC:
+      return '123456789999';
+    case BarcodeFormat.UPCE:
+      return '01245714';
+    case BarcodeFormat.ITF:
+      return '123456';
+    case BarcodeFormat.ITF14:
+      return '98765432109213';
+    case BarcodeFormat.MSI:
+      return '12345674';
+    case BarcodeFormat.MSI10:
+      return '1234567';
+    case BarcodeFormat.MSI11:
+      return '123456';
+    case BarcodeFormat.MSI1010:
+      return '1234567';
+    case BarcodeFormat.MSI1110:
+      return '12345678';
+    case BarcodeFormat.pharmacode:
+      return '1234';
+    case BarcodeFormat.codabar:
+      return 'A1234567890A';
+    default:
+      return '1234567890';
+  }
+};
+
 interface BarcodeConfig {
   format: BarcodeFormat;
   outputFormat: OutputFormat;
@@ -86,6 +134,16 @@ export function SimpleLinkConverter() {
   const [progress, setProgress] = useState(0);
   const [stats, setStats] = useState({ success: 0, failed: 0, processing: 0 });
   const [isAdvancedOptionsOpen, setIsAdvancedOptionsOpen] = useState(false);
+  
+  // 预览相关状态
+  const [previewDataURL, setPreviewDataURL] = useState<string | null>(null);
+  const [nextPreviewDataURL, setNextPreviewDataURL] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
+  const [isPreviewFading, setIsPreviewFading] = useState(false);
+  const previewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const previewImageRef = useRef<HTMLImageElement | null>(null);
+  const previewRequestIdRef = useRef<number>(0);
 
   // Barcode configuration
   const [barcodeConfig, setBarcodeConfig] = useState<BarcodeConfig>({
@@ -99,7 +157,7 @@ export function SimpleLinkConverter() {
     background: '#FFFFFF',
     margin: 10,
 
-    // 文本显示选项的默认值
+    // 文本显示选项的默认值（显示文本框默认为空，预览时使用示例文本）
     text: '',
     font: 'monospace',
     fontOptions: '',
@@ -120,8 +178,115 @@ export function SimpleLinkConverter() {
         clearInterval(tokenRefreshTimerRef.current);
         tokenRefreshTimerRef.current = null;
       }
+      if (previewTimeoutRef.current) {
+        clearTimeout(previewTimeoutRef.current);
+        previewTimeoutRef.current = null;
+      }
     };
   }, []);
+
+  // 序列化配置用于比较，避免不必要的重新生成
+  const configKey = useMemo(() => {
+    return JSON.stringify(barcodeConfig);
+  }, [barcodeConfig]);
+
+  // 生成预览的 useEffect（带防抖）
+  useEffect(() => {
+    // 清除之前的定时器
+    if (previewTimeoutRef.current) {
+      clearTimeout(previewTimeoutRef.current);
+    }
+
+    // 设置防抖，500ms 后生成预览，避免频繁更新
+    previewTimeoutRef.current = setTimeout(async () => {
+      // 生成新的请求 ID，用于确保只处理最新的请求
+      const currentRequestId = ++previewRequestIdRef.current;
+      
+      setIsGeneratingPreview(true);
+      setPreviewError(null);
+      
+      try {
+        // 使用示例文本生成预览（如果用户没有自定义文本，则使用格式对应的示例文本）
+        const previewText = barcodeConfig.text || getPreviewTextByFormat(barcodeConfig.format);
+        const result = await generateBarcode(
+          previewText,
+          barcodeConfig,
+          `preview.${barcodeConfig.outputFormat.toLowerCase()}`
+        );
+
+        // 检查是否是最新的请求
+        if (currentRequestId !== previewRequestIdRef.current) {
+          return; // 忽略旧的请求
+        }
+
+        if (result.success && result.dataURL) {
+          // 预加载图片，使用淡入淡出效果切换
+          const dataURL = result.dataURL;
+          const img = new Image();
+          
+          img.onload = () => {
+            // 再次检查是否是最新的请求
+            if (currentRequestId !== previewRequestIdRef.current) {
+              return; // 忽略旧的请求
+            }
+            // 图片加载完成后，先设置下一张图片，然后触发淡入淡出效果
+            setNextPreviewDataURL(dataURL);
+            // 使用 requestAnimationFrame 确保动画流畅
+            requestAnimationFrame(() => {
+              setIsPreviewFading(true);
+              
+              // 等待淡出动画完成后再切换图片
+              setTimeout(() => {
+                if (currentRequestId !== previewRequestIdRef.current) {
+                  return; // 忽略旧的请求
+                }
+                setPreviewDataURL(dataURL);
+                setNextPreviewDataURL(null);
+                setIsPreviewFading(false);
+                setIsGeneratingPreview(false);
+              }, 300); // 与 CSS transition duration 一致
+            });
+          };
+          
+          img.onerror = () => {
+            // 再次检查是否是最新的请求
+            if (currentRequestId !== previewRequestIdRef.current) {
+              return; // 忽略旧的请求
+            }
+            setIsGeneratingPreview(false);
+            setIsPreviewFading(false);
+            setPreviewError('预览图片加载失败');
+          };
+          
+          // 开始预加载图片
+          img.src = dataURL;
+        } else {
+          // 再次检查是否是最新的请求
+          if (currentRequestId !== previewRequestIdRef.current) {
+            return; // 忽略旧的请求
+          }
+          setPreviewError(result.error || '预览生成失败');
+          setPreviewDataURL(null);
+          setIsGeneratingPreview(false);
+        }
+      } catch (error) {
+        // 再次检查是否是最新的请求
+        if (currentRequestId !== previewRequestIdRef.current) {
+          return; // 忽略旧的请求
+        }
+        const errorMessage = error instanceof Error ? error.message : '预览生成失败';
+        setPreviewError(errorMessage);
+        setPreviewDataURL(null);
+        setIsGeneratingPreview(false);
+      }
+    }, 500); // 增加防抖时间到 500ms
+
+    return () => {
+      if (previewTimeoutRef.current) {
+        clearTimeout(previewTimeoutRef.current);
+      }
+    };
+  }, [configKey]); // 使用序列化的配置作为依赖
 
   // Fetch table fields and records
   const { data: fields, isLoading: fieldsLoading } = useQuery({
@@ -311,10 +476,25 @@ export function SimpleLinkConverter() {
         };
 
         try {
-          // 生成条码
+          // 编码数据始终使用字段数据
+          const encodeText = text.trim();
+          
+          // text 选项用于覆盖显示文本（条码下方的文字），不是编码数据
+          // 如果用户自定义了显示文本（不等于当前格式的示例文本），则使用自定义文本；否则不设置，让 JsBarcode 默认显示编码数据
+          const currentFormatText = getPreviewTextByFormat(barcodeConfig.format);
+          const isUserCustomText = barcodeConfig.text && barcodeConfig.text !== currentFormatText;
+          
+          // 生成条码配置：如果用户没有自定义显示文本，则清除 text 选项
+          const configForGeneration = isUserCustomText 
+            ? barcodeConfig 
+            : (() => {
+                const { text, ...rest } = barcodeConfig;
+                return rest;
+              })();
+          
           const barcodeResult: IBarcodeResult = await generateBarcode(
-            text.trim(),
-            barcodeConfig,
+            encodeText,
+            configForGeneration,
             `barcode_${record.id}_${Date.now()}.${barcodeConfig.outputFormat}`
           );
 
@@ -411,8 +591,8 @@ export function SimpleLinkConverter() {
         <div className="text-center space-y-4">
           <AlertCircle className="w-12 h-12 text-amber-500 mx-auto" />
           <div>
-            <h2 className="text-lg font-medium text-gray-900">{t('converter.pluginInitializing')}</h2>
-            <p className="text-sm text-gray-600 mt-1">{t('converter.gettingTableInfo')}</p>
+            <h2 className="text-sm font-medium text-gray-900">{t('converter.pluginInitializing')}</h2>
+            <p className="text-[13px] text-gray-600 mt-1">{t('converter.gettingTableInfo')}</p>
           </div>
         </div>
       </div>
@@ -425,7 +605,7 @@ export function SimpleLinkConverter() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="text-sm text-gray-600">{t('converter.loadingData')}</p>
+          <p className="text-[13px] text-gray-600">{t('converter.loadingData')}</p>
         </div>
       </div>
     );
@@ -436,7 +616,7 @@ export function SimpleLinkConverter() {
       {/* 条码配置 */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
+          <CardTitle className="flex items-center gap-2 text-sm">
             <Settings className="w-5 h-5" />
             条码配置
           </CardTitle>
@@ -447,7 +627,17 @@ export function SimpleLinkConverter() {
               <label className="text-sm font-medium text-gray-700">条码格式</label>
               <Select
                 value={barcodeConfig.format}
-                onValueChange={(value) => setBarcodeConfig(prev => ({ ...prev, format: value as BarcodeFormat }))}
+                onValueChange={(value) => {
+                  const newFormat = value as BarcodeFormat;
+                  setBarcodeConfig(prev => {
+                    // 如果 text 等于当前格式的示例文本，说明是自动填充的，切换格式时应该清空
+                    // 如果 text 为空或等于当前格式的示例文本，清空 text（显示文本框应该保持为空）
+                    const currentFormatText = getPreviewTextByFormat(prev.format);
+                    const isAutoFilledText = !prev.text || prev.text === currentFormatText;
+                    const newText = isAutoFilledText ? '' : prev.text;
+                    return { ...prev, format: newFormat, text: newText };
+                  });
+                }}
                 disabled={isConverting}
               >
                 <SelectTrigger>
@@ -542,7 +732,7 @@ export function SimpleLinkConverter() {
                 className="flex items-center justify-between w-full text-left hover:bg-gray-50 -mx-4 px-4 py-2 rounded transition-colors"
                 disabled={isConverting}
               >
-                <h3 className="text-lg font-medium text-gray-900">高级选项</h3>
+                <h3 className="text-sm font-medium text-gray-900">高级选项</h3>
                 {isAdvancedOptionsOpen ? (
                   <ChevronUp className="w-5 h-5 text-gray-500" />
                 ) : (
@@ -577,7 +767,7 @@ export function SimpleLinkConverter() {
                           placeholder="留空使用原始数据"
                           disabled={isConverting}
                         />
-                        <p className="text-xs text-gray-500">留空时将使用原始字段数据作为条码文本</p>
+                        <p className="text-[13px] text-gray-500">留空时将使用原始字段数据作为条码文本</p>
                       </div>
 
                       {/* 字体设置 */}
@@ -625,7 +815,7 @@ export function SimpleLinkConverter() {
 
                       {/* 文本显示选项 */}
                       <div className="space-y-4">
-                        <h4 className="text-md font-medium text-gray-800">文本显示选项</h4>
+                        <h4 className="text-sm font-medium text-gray-800">文本显示选项</h4>
                         
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
@@ -695,20 +885,29 @@ export function SimpleLinkConverter() {
 
                   {/* 边距选项 */}
                   <div className="space-y-4">
-                    <h4 className="text-md font-medium text-gray-800">边距选项</h4>
+                    <h4 className="text-sm font-medium text-gray-800">边距选项</h4>
                     
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-gray-700">统一边距: {barcodeConfig.margin}px</label>
                       <Slider
                         value={[barcodeConfig.margin]}
-                        onValueChange={([value]) => setBarcodeConfig(prev => ({ ...prev, margin: value as number }))}
+                        onValueChange={([value]) => {
+                          setBarcodeConfig(prev => {
+                            // 调整统一边距时，清除所有单独边距设置，让它们使用统一边距
+                            const { marginTop, marginBottom, marginLeft, marginRight, ...rest } = prev;
+                            return {
+                              ...rest,
+                              margin: value as number,
+                            };
+                          });
+                        }}
                         max={50}
                         min={0}
                         step={1}
                         disabled={isConverting}
                         className="w-full"
                       />
-                      <p className="text-xs text-gray-500">设置统一的边距，可被各方向边距覆盖</p>
+                      <p className="text-[13px] text-gray-500">设置统一的边距，可被各方向边距覆盖</p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -810,55 +1009,131 @@ export function SimpleLinkConverter() {
                     </div>
                   </div>
 
-                  {/* 格式特定选项 */}
-                  <div className="space-y-4">
-                    <h4 className="text-md font-medium text-gray-800">格式特定选项</h4>
-
-                    {/* CODE128系列选项 */}
-                    {(barcodeConfig.format === 'CODE128' ||
+                  {/* 格式特定选项 - 仅在相关格式时显示 */}
+                  {((barcodeConfig.format === 'CODE128' ||
                       barcodeConfig.format === 'CODE128A' ||
                       barcodeConfig.format === 'CODE128B' ||
-                      barcodeConfig.format === 'CODE128C') && (
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">GS1-128编码</label>
-                        <div className="flex items-center space-x-2">
-                          <Switch
-                            checked={typeof barcodeConfig.ean128 === 'boolean' ? barcodeConfig.ean128 : barcodeConfig.ean128 === 'true'}
-                            onCheckedChange={(checked) => setBarcodeConfig(prev => ({ ...prev, ean128: checked }))}
-                            disabled={isConverting}
-                          />
-                          <span className="text-sm text-gray-600">启用GS1-128/EAN-128编码</span>
-                        </div>
-                        <p className="text-xs text-gray-500">用于国际标准物流和商品编码</p>
-                      </div>
-                    )}
-
-                    {/* EAN/UPC系列选项 */}
-                    {(barcodeConfig.format === 'EAN13' ||
+                      barcodeConfig.format === 'CODE128C') ||
+                    (barcodeConfig.format === 'EAN13' ||
                       barcodeConfig.format === 'EAN8' ||
                       barcodeConfig.format === 'EAN5' ||
                       barcodeConfig.format === 'EAN2' ||
                       barcodeConfig.format === 'UPC' ||
-                      barcodeConfig.format === 'UPCE') && (
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">扁平化编码</label>
-                        <div className="flex items-center space-x-2">
-                          <Switch
-                            checked={barcodeConfig.flat}
-                            onCheckedChange={(checked) => setBarcodeConfig(prev => ({ ...prev, flat: checked }))}
-                            disabled={isConverting}
-                          />
-                          <span className="text-sm text-gray-600">启用扁平化编码</span>
+                      barcodeConfig.format === 'UPCE')) && (
+                    <div className="space-y-4">
+                      <h4 className="text-sm font-medium text-gray-800">格式特定选项</h4>
+
+                      {/* CODE128系列选项 */}
+                      {(barcodeConfig.format === 'CODE128' ||
+                        barcodeConfig.format === 'CODE128A' ||
+                        barcodeConfig.format === 'CODE128B' ||
+                        barcodeConfig.format === 'CODE128C') && (
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-700">GS1-128编码</label>
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              checked={typeof barcodeConfig.ean128 === 'boolean' ? barcodeConfig.ean128 : barcodeConfig.ean128 === 'true'}
+                              onCheckedChange={(checked) => setBarcodeConfig(prev => ({ ...prev, ean128: checked }))}
+                              disabled={isConverting}
+                            />
+                            <span className="text-[13px] text-gray-600">启用GS1-128/EAN-128编码</span>
+                          </div>
+                          <p className="text-[13px] text-gray-500">用于国际标准物流和商品编码</p>
                         </div>
-                        <p className="text-xs text-gray-500">移除扩展条和分隔符，产生更紧凑的条码</p>
-                      </div>
-                    )}
-                  </div>
+                      )}
+
+                      {/* EAN/UPC系列选项 */}
+                      {(barcodeConfig.format === 'EAN13' ||
+                        barcodeConfig.format === 'EAN8' ||
+                        barcodeConfig.format === 'EAN5' ||
+                        barcodeConfig.format === 'EAN2' ||
+                        barcodeConfig.format === 'UPC' ||
+                        barcodeConfig.format === 'UPCE') && (
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-700">扁平化编码</label>
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              checked={barcodeConfig.flat}
+                              onCheckedChange={(checked) => setBarcodeConfig(prev => ({ ...prev, flat: checked }))}
+                              disabled={isConverting}
+                            />
+                            <span className="text-[13px] text-gray-600">启用扁平化编码</span>
+                          </div>
+                          <p className="text-[13px] text-gray-500">移除扩展条和分隔符，产生更紧凑的条码</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </CardContent>
         </Card>
+
+      {/* 预览区域 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <span>📊</span>
+            预览
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isGeneratingPreview ? (
+            <div className="flex flex-col items-center justify-center py-8 space-y-2">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <p className="text-[13px] text-gray-600">正在生成预览...</p>
+            </div>
+          ) : previewError ? (
+            <div className="flex flex-col items-center justify-center py-8 space-y-2">
+              <AlertCircle className="w-8 h-8 text-red-500" />
+              <p className="text-[13px] text-red-600">{previewError}</p>
+              <p className="text-[13px] text-gray-500">预览文本: {barcodeConfig.text || getPreviewTextByFormat(barcodeConfig.format)}</p>
+            </div>
+          ) : previewDataURL ? (
+            <div className="flex flex-col items-center space-y-3">
+              <div className="relative p-4 bg-white border rounded-lg flex items-center justify-center min-h-[100px] overflow-hidden">
+                {/* 当前显示的图片 */}
+                {previewDataURL && (
+                  <img 
+                    ref={previewImageRef}
+                    src={previewDataURL} 
+                    alt="条码预览" 
+                    className={`max-w-full h-auto transition-opacity duration-300 ease-in-out ${
+                      isPreviewFading ? 'opacity-0' : 'opacity-100'
+                    }`}
+                    style={{ maxHeight: '200px' }}
+                  />
+                )}
+                {/* 下一张预加载的图片 */}
+                {nextPreviewDataURL && (
+                  <img 
+                    src={nextPreviewDataURL} 
+                    alt="条码预览" 
+                    className={`absolute inset-0 p-4 max-w-full h-auto transition-opacity duration-300 ease-in-out ${
+                      isPreviewFading ? 'opacity-100' : 'opacity-0'
+                    }`}
+                    style={{ maxHeight: '200px', objectFit: 'contain' }}
+                  />
+                )}
+                {/* 加载指示器 */}
+                {isGeneratingPreview && !nextPreviewDataURL && (
+                  <div className="absolute inset-0 flex items-center justify-center z-10 bg-white bg-opacity-50 backdrop-blur-sm">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  </div>
+                )}
+              </div>
+              <p className="text-[13px] text-gray-500">
+                预览文本: <span className="font-mono">{barcodeConfig.text || getPreviewTextByFormat(barcodeConfig.format)}</span>
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-8">
+              <p className="text-[13px] text-gray-500">配置条码参数以查看预览</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Separator />
 
@@ -910,7 +1185,7 @@ export function SimpleLinkConverter() {
                   <div className="flex items-center gap-2">
                     {getFieldIcon(field.type, field.cellValueType)}
                     <span>{field.name}</span>
-                    <span className="text-xs text-gray-500 ml-1">
+                    <span className="text-[13px] text-gray-500 ml-1">
                       {field.cellValueType === 'number' ? '(数字)' : '(文本)'}
                     </span>
                   </div>
@@ -976,14 +1251,14 @@ export function SimpleLinkConverter() {
           </div>
           {isConverting && (
             <div className="space-y-2">
-              <div className="flex justify-between text-sm text-gray-600 mb-1">
+              <div className="flex justify-between text-[13px] text-gray-600 mb-1">
                 <span>{t('converter.progress')}</span>
                 <span>{Math.round(progress)}%</span>
               </div>
               <Progress value={progress} className="h-2" />
             </div>
           )}
-          <div className="flex gap-6 text-sm">
+          <div className="flex gap-6 text-[13px]">
             <span className="text-green-600">{t('converter.successful')}: {stats.success}{t('converter.countUnit')}</span>
             {stats.failed > 0 && <span className="text-red-600">{t('converter.failed')}: {stats.failed}{t('converter.countUnit')}</span>}
             {stats.processing > 0 && <span className="text-blue-600">{t('converter.processing')}: {stats.processing}{t('converter.countUnit')}</span>}
