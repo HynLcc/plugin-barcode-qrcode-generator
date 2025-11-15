@@ -331,51 +331,6 @@ export class BarcodeGenerator {
     return results;
   }
 
-  /**
-   * 过滤格式特定选项，只保留当前格式适用的选项
-   * @param options 完整的选项配置
-   * @returns 过滤后的选项配置
-   */
-  private filterFormatSpecificOptions(options: IBarcodeOptions): IBarcodeOptions {
-    // 解构排除 format, ean128, flat
-    // 注意：不排除 valid，因为我们会在 generateBarcode 中添加自己的 valid 回调
-    const { format, ean128, flat, ...commonOptions } = options;
-
-    // 创建基础选项（排除格式特定选项）
-    const filtered: IBarcodeOptions = { ...commonOptions };
-
-    // 根据格式类型添加特定选项
-    switch (format) {
-      case BarcodeFormat.CODE128:
-      case BarcodeFormat.CODE128A:
-      case BarcodeFormat.CODE128B:
-      case BarcodeFormat.CODE128C:
-        // CODE128系列支持ean128选项
-        if (ean128 !== false && ean128 !== undefined) {
-          filtered.ean128 = ean128;
-        }
-        break;
-
-      case BarcodeFormat.EAN13:
-      case BarcodeFormat.EAN8:
-      case BarcodeFormat.EAN5:
-      case BarcodeFormat.EAN2:
-      case BarcodeFormat.UPC:
-      case BarcodeFormat.UPCE:
-        // EAN/UPC系列支持flat选项
-        if (flat !== false && flat !== undefined) {
-          filtered.flat = flat;
-        }
-        break;
-
-      default:
-        // 其他格式忽略ean128和flat选项
-        break;
-    }
-
-    return filtered;
-  }
-
   
   
 
