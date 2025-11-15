@@ -159,7 +159,7 @@ const DEFAULT_BARCODE_OPTIONS: Omit<Required<IBarcodeOptions>, 'valid'> = {
   ean128: false, // 默认不启用GS1-128编码
   flat: false // 默认不扁平化编码
 
-  // 注意：不设置 valid 回调，让 JsBarcode 在数据无效时抛出异常
+  // 注意：valid 回调会在 generateBarcode 方法中添加，用于验证数据有效性
 };
 
 /**
@@ -201,19 +201,15 @@ export class BarcodeGenerator {
       // 合并配置
       const mergedOptions = { ...this.defaultOptions, ...options };
 
-      // 过滤格式特定选项，只保留适用的选项
-      const filteredOptions = this.filterFormatSpecificOptions(mergedOptions);
-
-      // 确保不提供 valid 回调，完全依赖 JsBarcode 的验证机制
-      // 根据 JsBarcode 源码：如果没有提供 valid 回调，当 !encoder.valid() 时会抛出 InvalidInputException
-      // 这样可以阻止无效数据的条码生成
-      // 如果提供了 valid 回调，JsBarcode 会调用回调而不是抛出异常，不会阻止生成
-      const { valid: _valid, ...optionsForGeneration } = filteredOptions;
-      
-      // 确保 optionsForGeneration 中不包含 valid
-      if ('valid' in optionsForGeneration) {
-        delete (optionsForGeneration as any).valid;
-      }
+      // 添加校验回调，使用JsBarcode内置的验证
+      const optionsWithValidation = {
+        ...mergedOptions,
+        valid: (valid: boolean) => {
+          if (!valid) {
+            throw new Error(`Invalid data for ${mergedOptions.format} format: "${text}"`);
+          }
+        }
+      };
 
       
       const outputFormat = mergedOptions.outputFormat || OutputFormat.PNG;
@@ -226,9 +222,8 @@ export class BarcodeGenerator {
         const svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
 
         try {
-          // 生成 SVG 条码
-          // 如果没有提供 valid 回调，JsBarcode 会在数据无效时抛出异常，阻止生成
-          JsBarcode(svgElement, text, optionsForGeneration);
+          // 生成 SVG 条码（使用带验证的选项）
+          JsBarcode(svgElement, text, optionsWithValidation);
 
           // 转换为 SVG 字符串
           const svgString = new XMLSerializer().serializeToString(svgElement);
@@ -255,9 +250,8 @@ export class BarcodeGenerator {
         canvas.id = `barcode-canvas-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
         try {
-          // 生成条码
-          // 如果没有提供 valid 回调，JsBarcode 会在数据无效时抛出异常，阻止生成
-          JsBarcode(canvas, text, optionsForGeneration);
+          // 生成条码（使用带验证的选项）
+          JsBarcode(canvas, text, optionsWithValidation);
 
           // 转换为Blob
           blob = await new Promise<Blob>((resolve, reject) => {
@@ -343,17 +337,12 @@ export class BarcodeGenerator {
    * @returns 过滤后的选项配置
    */
   private filterFormatSpecificOptions(options: IBarcodeOptions): IBarcodeOptions {
-    // 解构排除 format, ean128, flat, valid
-    const { format, ean128, flat, valid, ...commonOptions } = options;
+    // 解构排除 format, ean128, flat
+    // 注意：不排除 valid，因为我们会在 generateBarcode 中添加自己的 valid 回调
+    const { format, ean128, flat, ...commonOptions } = options;
 
-    // 创建基础选项（排除格式特定选项和 valid 回调）
-    // 不提供 valid 回调，让 JsBarcode 在数据无效时抛出异常
+    // 创建基础选项（排除格式特定选项）
     const filtered: IBarcodeOptions = { ...commonOptions };
-    
-    // 确保 filtered 中不包含 valid（双重保险）
-    if ('valid' in filtered) {
-      delete filtered.valid;
-    }
 
     // 根据格式类型添加特定选项
     switch (format) {
