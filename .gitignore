@@ -114,3 +114,7 @@ storybook-static
 需求.md
 RANKING_FEATURE_SUMMARY.md
 CLAUDE.md
+
+# Test data files
+*.csv
+!src/data/*.csv
