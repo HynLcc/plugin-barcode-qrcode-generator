@@ -104,8 +104,6 @@ export interface IBarcodeOptions {
   flat?: boolean;
   /** 添加最后字符 */
   lastChar?: string;
-  /** 渲染end-of-transmission字符 */
-  eotRender?: boolean;
 
   /** 验证回调函数 */
   valid?: (valid: boolean) => void;
@@ -163,7 +161,6 @@ const DEFAULT_BARCODE_OPTIONS: Required<IBarcodeOptions> = {
   ean128: false, // 默认不启用GS1-128编码
   flat: false, // 默认不扁平化编码
   lastChar: '', // 默认不添加最后字符
-  eotRender: false, // 默认不渲染EOT字符
 
   valid: () => {}
 };
@@ -352,7 +349,7 @@ export class BarcodeGenerator {
       case BarcodeFormat.CODE128B:
       case BarcodeFormat.CODE128C:
         // CODE128系列支持ean128选项
-        if (ean128 !== false) {
+        if (ean128 !== false && ean128 !== undefined) {
           filtered.ean128 = ean128;
         }
         break;
@@ -364,7 +361,7 @@ export class BarcodeGenerator {
       case BarcodeFormat.UPC:
       case BarcodeFormat.UPCE:
         // EAN/UPC系列支持flat选项
-        if (flat !== false) {
+        if (flat !== false && flat !== undefined) {
           filtered.flat = flat;
         }
         break;
@@ -374,12 +371,9 @@ export class BarcodeGenerator {
         break;
     }
 
-    // 通用选项（lastChar, eotRender）适用于所有格式，但需要检查是否有实际值
+    // 通用选项（lastChar）适用于所有格式，但需要检查是否有实际值
     if (options.lastChar) {
       filtered.lastChar = options.lastChar;
-    }
-    if (options.eotRender) {
-      filtered.eotRender = options.eotRender;
     }
 
     return filtered;

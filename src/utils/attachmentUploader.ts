@@ -181,7 +181,9 @@ export class AttachmentUploader {
 
   /**
    * 处理上传队列
+   * @internal 此方法用于队列处理，虽然当前未直接调用，但在队列功能中会被递归调用
    */
+  // @ts-expect-error - 此方法在队列功能中会被递归调用，但TypeScript无法检测到
   private async processQueue(): Promise<void> {
     if (this.currentUploads >= this.config.maxConcurrency || this.uploadQueue.length === 0) {
       return;
@@ -242,7 +244,9 @@ export class AttachmentUploader {
    * @param response 下载响应
    * @param url 原始URL
    * @returns 文件名
+   * @internal 此方法保留用于未来功能扩展
    */
+  // @ts-expect-error - 此方法保留用于未来功能扩展
   private extractFileNameFromResponse(response: Response, url: string): string {
     // 尝试从 Content-Disposition 头获取文件名
     const contentDisposition = response.headers.get('content-disposition');

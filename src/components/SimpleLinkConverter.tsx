@@ -26,12 +26,18 @@ import {
   File,
   Settings,
   Hash,
+  ChevronDown,
+  ChevronUp,
 } from '@teable/icons';
 import * as openApi from '@teable/openapi';
 import { axios } from '@teable/openapi';
 import { generateBarcode, BarcodeFormat, OutputFormat, IBarcodeResult, BarcodeGenerator } from '@/utils/barcodeGenerator';
 import { useViews } from '@/hooks/useViews';
 import { useGlobalUrlParams } from '@/hooks/useGlobalUrlParams';
+import { IView } from '@/types';
+
+// 必填标记组件
+export const RequireCom = () => <span className="ml-0.5 text-red-500">*</span>;
 
 interface BarcodeConfig {
   format: BarcodeFormat;
@@ -51,7 +57,6 @@ interface BarcodeConfig {
   ean128: boolean | string;
   flat: boolean;
   lastChar: string;
-  eotRender: boolean;
 }
 
 export function SimpleLinkConverter() {
@@ -72,6 +77,7 @@ export function SimpleLinkConverter() {
   const [isConverting, setIsConverting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [stats, setStats] = useState({ success: 0, failed: 0, processing: 0 });
+  const [isAdvancedOptionsOpen, setIsAdvancedOptionsOpen] = useState(false);
 
   // Barcode configuration
   const [barcodeConfig, setBarcodeConfig] = useState<BarcodeConfig>({
@@ -91,8 +97,7 @@ export function SimpleLinkConverter() {
     fontOptions: '',
     ean128: false,
     flat: false,
-    lastChar: '',
-    eotRender: false
+    lastChar: ''
   });
 
   // 清理定时器的 useEffect
@@ -119,6 +124,7 @@ export function SimpleLinkConverter() {
 
   // Get views
   const { data: views = [], isLoading: viewsLoading } = useViews();
+  const viewsArray: IView[] = Array.isArray(views) ? views : [];
 
   // Filter fields by type (memoized for performance)
   const textFields = useMemo(() =>
@@ -205,9 +211,7 @@ export function SimpleLinkConverter() {
   // 生成条码并上传的转换方法
   const handleBarcodeConvert = async () => {
     if (!isConfigValid) {
-      toast.error(t('converter.configIncomplete'), {
-        description: t('converter.selectViewUrlAndAttachmentFields')
-      });
+      toast.error(t('converter.configIncomplete'));
       return;
     }
 
@@ -533,134 +537,138 @@ export function SimpleLinkConverter() {
             {/* 新增的JsBarcode选项 */}
             <Separator />
             <div className="space-y-4">
-              <h3 className="text-lg font-medium text-gray-900">高级选项</h3>
-
-              {/* 文本覆盖选项 */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">显示文本（覆盖原始数据）</label>
-                <Input
-                  value={barcodeConfig.text}
-                  onChange={(e) => setBarcodeConfig(prev => ({ ...prev, text: e.target.value }))}
-                  placeholder="留空使用原始数据"
-                  disabled={isConverting}
-                />
-                <p className="text-xs text-gray-500">留空时将使用原始字段数据作为条码文本</p>
-              </div>
-
-              {/* 字体设置 */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">字体系列</label>
-                  <Select
-                    value={barcodeConfig.font}
-                    onValueChange={(value) => setBarcodeConfig(prev => ({ ...prev, font: value }))}
-                    disabled={isConverting}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="选择字体" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="monospace">Monospace</SelectItem>
-                      <SelectItem value="Arial">Arial</SelectItem>
-                      <SelectItem value="Helvetica">Helvetica</SelectItem>
-                      <SelectItem value="Times New Roman">Times New Roman</SelectItem>
-                      <SelectItem value="Courier New">Courier New</SelectItem>
-                      <SelectItem value="Verdana">Verdana</SelectItem>
-                      <SelectItem value="Georgia">Georgia</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">字体样式</label>
-                  <Select
-                    value={barcodeConfig.fontOptions}
-                    onValueChange={(value) => setBarcodeConfig(prev => ({ ...prev, fontOptions: value }))}
-                    disabled={isConverting}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="选择样式" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">默认</SelectItem>
-                      <SelectItem value="bold">粗体</SelectItem>
-                      <SelectItem value="italic">斜体</SelectItem>
-                      <SelectItem value="bold italic">粗斜体</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              {/* 格式特定选项 */}
-              <div className="space-y-4">
-                <h4 className="text-md font-medium text-gray-800">格式特定选项</h4>
-
-                {/* CODE128系列选项 */}
-                {(barcodeConfig.format === 'CODE128' ||
-                  barcodeConfig.format === 'CODE128A' ||
-                  barcodeConfig.format === 'CODE128B' ||
-                  barcodeConfig.format === 'CODE128C') && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">GS1-128编码</label>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        checked={typeof barcodeConfig.ean128 === 'boolean' ? barcodeConfig.ean128 : barcodeConfig.ean128 === 'true'}
-                        onCheckedChange={(checked) => setBarcodeConfig(prev => ({ ...prev, ean128: checked }))}
-                        disabled={isConverting}
-                      />
-                      <span className="text-sm text-gray-600">启用GS1-128/EAN-128编码</span>
-                    </div>
-                    <p className="text-xs text-gray-500">用于国际标准物流和商品编码</p>
-                  </div>
+              <button
+                type="button"
+                onClick={() => setIsAdvancedOptionsOpen(!isAdvancedOptionsOpen)}
+                className="flex items-center justify-between w-full text-left hover:bg-gray-50 -mx-4 px-4 py-2 rounded transition-colors"
+                disabled={isConverting}
+              >
+                <h3 className="text-lg font-medium text-gray-900">高级选项</h3>
+                {isAdvancedOptionsOpen ? (
+                  <ChevronUp className="w-5 h-5 text-gray-500" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-gray-500" />
                 )}
+              </button>
 
-                {/* EAN/UPC系列选项 */}
-                {(barcodeConfig.format === 'EAN13' ||
-                  barcodeConfig.format === 'EAN8' ||
-                  barcodeConfig.format === 'EAN5' ||
-                  barcodeConfig.format === 'EAN2' ||
-                  barcodeConfig.format === 'UPC' ||
-                  barcodeConfig.format === 'UPCE') && (
+              {isAdvancedOptionsOpen && (
+                <div className="space-y-4 pt-2">
+                  {/* 文本覆盖选项 */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">扁平化编码</label>
-                    <div className="flex items-center space-x-2">
-                      <Switch
-                        checked={barcodeConfig.flat}
-                        onCheckedChange={(checked) => setBarcodeConfig(prev => ({ ...prev, flat: checked }))}
-                        disabled={isConverting}
-                      />
-                      <span className="text-sm text-gray-600">启用扁平化编码</span>
-                    </div>
-                    <p className="text-xs text-gray-500">移除扩展条和分隔符，产生更紧凑的条码</p>
-                  </div>
-                )}
-
-                {/* 通用选项 */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">最后字符</label>
+                    <label className="text-sm font-medium text-gray-700">显示文本（覆盖原始数据）</label>
                     <Input
-                      value={barcodeConfig.lastChar}
-                      onChange={(e) => setBarcodeConfig(prev => ({ ...prev, lastChar: e.target.value }))}
-                      placeholder="可选"
+                      value={barcodeConfig.text}
+                      onChange={(e) => setBarcodeConfig(prev => ({ ...prev, text: e.target.value }))}
+                      placeholder="留空使用原始数据"
                       disabled={isConverting}
-                      maxLength={1}
                     />
-                    <p className="text-xs text-gray-500">添加到条码末尾的字符</p>
+                    <p className="text-xs text-gray-500">留空时将使用原始字段数据作为条码文本</p>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">EOT字符渲染</label>
-                    <div className="flex items-center space-x-2 mt-3">
-                      <Switch
-                        checked={barcodeConfig.eotRender}
-                        onCheckedChange={(checked) => setBarcodeConfig(prev => ({ ...prev, eotRender: checked }))}
+
+                  {/* 字体设置 */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">字体系列</label>
+                      <Select
+                        value={barcodeConfig.font}
+                        onValueChange={(value) => setBarcodeConfig(prev => ({ ...prev, font: value }))}
                         disabled={isConverting}
-                      />
-                      <span className="text-sm text-gray-600">渲染EOT字符</span>
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="选择字体" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="monospace">Monospace</SelectItem>
+                          <SelectItem value="Arial">Arial</SelectItem>
+                          <SelectItem value="Helvetica">Helvetica</SelectItem>
+                          <SelectItem value="Times New Roman">Times New Roman</SelectItem>
+                          <SelectItem value="Courier New">Courier New</SelectItem>
+                          <SelectItem value="Verdana">Verdana</SelectItem>
+                          <SelectItem value="Georgia">Georgia</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <p className="text-xs text-gray-500">显示传输结束字符</p>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">字体样式</label>
+                      <Select
+                        value={barcodeConfig.fontOptions || 'default'}
+                        onValueChange={(value) => setBarcodeConfig(prev => ({ ...prev, fontOptions: value === 'default' ? '' : value }))}
+                        disabled={isConverting}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="选择样式" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="default">默认</SelectItem>
+                          <SelectItem value="bold">粗体</SelectItem>
+                          <SelectItem value="italic">斜体</SelectItem>
+                          <SelectItem value="bold italic">粗斜体</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* 格式特定选项 */}
+                  <div className="space-y-4">
+                    <h4 className="text-md font-medium text-gray-800">格式特定选项</h4>
+
+                    {/* CODE128系列选项 */}
+                    {(barcodeConfig.format === 'CODE128' ||
+                      barcodeConfig.format === 'CODE128A' ||
+                      barcodeConfig.format === 'CODE128B' ||
+                      barcodeConfig.format === 'CODE128C') && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">GS1-128编码</label>
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            checked={typeof barcodeConfig.ean128 === 'boolean' ? barcodeConfig.ean128 : barcodeConfig.ean128 === 'true'}
+                            onCheckedChange={(checked) => setBarcodeConfig(prev => ({ ...prev, ean128: checked }))}
+                            disabled={isConverting}
+                          />
+                          <span className="text-sm text-gray-600">启用GS1-128/EAN-128编码</span>
+                        </div>
+                        <p className="text-xs text-gray-500">用于国际标准物流和商品编码</p>
+                      </div>
+                    )}
+
+                    {/* EAN/UPC系列选项 */}
+                    {(barcodeConfig.format === 'EAN13' ||
+                      barcodeConfig.format === 'EAN8' ||
+                      barcodeConfig.format === 'EAN5' ||
+                      barcodeConfig.format === 'EAN2' ||
+                      barcodeConfig.format === 'UPC' ||
+                      barcodeConfig.format === 'UPCE') && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">扁平化编码</label>
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            checked={barcodeConfig.flat}
+                            onCheckedChange={(checked) => setBarcodeConfig(prev => ({ ...prev, flat: checked }))}
+                            disabled={isConverting}
+                          />
+                          <span className="text-sm text-gray-600">启用扁平化编码</span>
+                        </div>
+                        <p className="text-xs text-gray-500">移除扩展条和分隔符，产生更紧凑的条码</p>
+                      </div>
+                    )}
+
+                    {/* 通用选项 */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">最后字符</label>
+                        <Input
+                          value={barcodeConfig.lastChar}
+                          onChange={(e) => setBarcodeConfig(prev => ({ ...prev, lastChar: e.target.value }))}
+                          placeholder="可选"
+                          disabled={isConverting}
+                          maxLength={1}
+                        />
+                        <p className="text-xs text-gray-500">添加到条码末尾的字符</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -669,16 +677,19 @@ export function SimpleLinkConverter() {
 
       {/* 选择视图 */}
       <div className="space-y-2">
-        <label className="text-sm font-medium text-gray-700">{t('converter.selectView')}</label>
+        <label className="text-sm font-medium text-gray-700">
+          {t('converter.selectView')}
+          <RequireCom />
+        </label>
         <Select value={selectedViewId} onValueChange={setSelectedViewId} disabled={isConverting}>
           <SelectTrigger>
             <SelectValue placeholder={t('converter.selectViewPlaceholder')} />
           </SelectTrigger>
           <SelectContent>
-            {views.length === 0 ? (
+            {viewsArray.length === 0 ? (
               <SelectItem value="no-views" disabled>{t('converter.noViewsFound')}</SelectItem>
             ) : (
-              views.map((view) => (
+              viewsArray.map((view) => (
                 <SelectItem key={view.id} value={view.id}>
                   <div className="flex items-center gap-2">
                     {getViewIcon(view.type)}
@@ -695,6 +706,7 @@ export function SimpleLinkConverter() {
       <div className="space-y-2">
         <label className="text-sm font-medium text-gray-700">
           选择数据字段
+          <RequireCom />
         </label>
         <Select value={selectedUrlField} onValueChange={setSelectedUrlField} disabled={isConverting}>
           <SelectTrigger>
@@ -724,7 +736,10 @@ export function SimpleLinkConverter() {
 
       {/* 选择附件字段 */}
       <div className="space-y-2">
-        <label className="text-sm font-medium text-gray-700">{t('converter.selectAttachmentField')}</label>
+        <label className="text-sm font-medium text-gray-700">
+          {t('converter.selectAttachmentField')}
+          <RequireCom />
+        </label>
         <Select value={selectedAttachmentField} onValueChange={setSelectedAttachmentField} disabled={isConverting}>
           <SelectTrigger>
             <SelectValue placeholder={t('converter.selectFieldPlaceholder')} />
@@ -745,14 +760,6 @@ export function SimpleLinkConverter() {
           </SelectContent>
         </Select>
       </div>
-
-      {/* 配置提示 */}
-      {!isConfigValid && (
-        <div className="p-3 bg-amber-50 border border-amber-200 rounded text-sm text-amber-800">
-          <AlertCircle className="inline-block w-4 h-4 mr-1" />
-          {t('converter.pleaseSelectFields')}
-        </div>
-      )}
 
       {/* 开始转换按钮 */}
       <Button
