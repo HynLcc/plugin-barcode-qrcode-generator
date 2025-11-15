@@ -80,15 +80,30 @@ export interface IBarcodeOptions {
   background?: string;
   /** 边距 */
   margin?: number;
-  /** 左边距 */
+  /** 上边距 */
   marginTop?: number;
-  /** 右边距 */
+  /** 下边距 */
   marginBottom?: number;
   /** 左边距 */
   marginLeft?: number;
   /** 右边距 */
   marginRight?: number;
-  /** 是否有效验码 */
+
+  // 新增的JsBarcode选项
+  /** 覆盖显示的文本 */
+  text?: string;
+  /** 字体系列 (默认 "monospace") */
+  font?: string;
+  /** 字体样式选项 ("bold", "italic", "bold italic") */
+  fontOptions?: string;
+
+  // 特定格式选项
+  /** CODE128系列: GS1-128/EAN-128编码 */
+  ean128?: boolean | string;
+  /** EAN/UPC系列: 扁平化编码 */
+  flat?: boolean;
+
+  /** 验证回调函数 */
   valid?: (valid: boolean) => void;
 }
 
@@ -119,7 +134,7 @@ export interface IBarcodeResult {
 /**
  * 默认条码配置
  */
-const DEFAULT_BARCODE_OPTIONS: Required<IBarcodeOptions> = {
+const DEFAULT_BARCODE_OPTIONS: Omit<Required<IBarcodeOptions>, 'valid'> = {
   format: BarcodeFormat.CODE128,
   outputFormat: OutputFormat.PNG,
   width: 2,
@@ -136,7 +151,15 @@ const DEFAULT_BARCODE_OPTIONS: Required<IBarcodeOptions> = {
   marginBottom: 10,
   marginLeft: 10,
   marginRight: 10,
-  valid: () => {}
+
+  // 新增选项的默认值
+  text: '', // 不覆盖文本，使用原始数据
+  font: 'monospace', // JsBarcode默认字体
+  fontOptions: '', // 无特殊字体样式
+  ean128: false, // 默认不启用GS1-128编码
+  flat: false // 默认不扁平化编码
+
+  // 注意：valid 回调会在 generateBarcode 方法中添加，用于验证数据有效性
 };
 
 /**
@@ -214,6 +237,9 @@ export class BarcodeGenerator {
           // 生成文件名
           finalFileName = fileName || this.generateFileName(text, mergedOptions.format, 'svg');
 
+        } catch (jsbarcodeError) {
+          // 捕获 JsBarcode 抛出的异常（无效数据会抛出 InvalidInputException）
+          throw jsbarcodeError; // 重新抛出异常
         } finally {
           // 清理 SVG 元素
           svgElement.remove();
@@ -245,6 +271,9 @@ export class BarcodeGenerator {
           // 生成文件名
           finalFileName = fileName || this.generateFileName(text, mergedOptions.format, 'png');
 
+        } catch (jsbarcodeError) {
+          // 捕获 JsBarcode 抛出的异常（无效数据会抛出 InvalidInputException）
+          throw jsbarcodeError; // 重新抛出异常
         } finally {
           // 清理canvas元素
           canvas.remove();
@@ -261,7 +290,7 @@ export class BarcodeGenerator {
     } catch (error) {
       result.error = error instanceof Error ? error.message : 'Unknown barcode generation error';
       console.error(`Failed to generate barcode for "${text}":`, error);
-      console.error(`Barcode config:`, mergedOptions);
+      console.error(`Barcode config:`, options);
     } finally {
       result.duration = Date.now() - startTime;
     }
@@ -302,138 +331,9 @@ export class BarcodeGenerator {
     return results;
   }
 
-  /**
-   * 验证条码内容和格式
-   * @param text 文本内容
-   * @param format 条码格式
-   */
-  private validateBarcodeContent(text: string, format?: BarcodeFormat): void {
-    const selectedFormat = format || this.defaultOptions.format;
-
-    switch (selectedFormat) {
-      // EAN/UPC 系列
-      case BarcodeFormat.EAN13:
-        if (!/^\d{12,13}$/.test(text)) {
-          throw new Error('EAN13 requires 12 or 13 digits');
-        }
-        break;
-
-      case BarcodeFormat.EAN8:
-        if (!/^\d{7,8}$/.test(text)) {
-          throw new Error('EAN8 requires 7 or 8 digits');
-        }
-        break;
-
-      case BarcodeFormat.EAN5:
-        if (!/^\d{5}$/.test(text)) {
-          throw new Error('EAN5 requires exactly 5 digits');
-        }
-        break;
-
-      case BarcodeFormat.EAN2:
-        if (!/^\d{2}$/.test(text)) {
-          throw new Error('EAN2 requires exactly 2 digits');
-        }
-        break;
-
-      case BarcodeFormat.UPC:
-        if (!/^\d{11,12}$/.test(text)) {
-          throw new Error('UPC requires 11 or 12 digits');
-        }
-        break;
-
-      case BarcodeFormat.UPCE:
-        if (!/^\d{6,8}$/.test(text)) {
-          throw new Error('UPCE requires 6 to 8 digits');
-        }
-        break;
-
-      // CODE128 系列
-      case BarcodeFormat.CODE128:
-        // CODE128 支持ASCII 0-127的所有字符
-        if (text.length === 0) {
-          throw new Error('CODE128 requires at least one character');
-        }
-        break;
-
-      case BarcodeFormat.CODE128A:
-        // CODE128A 支持控制字符 (00-95) 和特殊字符
-        if (text.length === 0) {
-          throw new Error('CODE128A requires at least one character');
-        }
-        break;
-
-      case BarcodeFormat.CODE128B:
-        // CODE128B 支持ASCII字符 (32-127)
-        if (text.length === 0) {
-          throw new Error('CODE128B requires at least one character');
-        }
-        break;
-
-      case BarcodeFormat.CODE128C:
-        // CODE128C 专门用于数字对，需要偶数位长度
-        if (!/^\d+$/.test(text) || text.length === 0) {
-          throw new Error('CODE128C requires digits, preferably in pairs');
-        }
-        break;
-
-      // CODE39
-      case BarcodeFormat.CODE39:
-        // CODE39 支持字母数字、空格和一些特殊字符
-        if (!/^[0-9A-Z\-\.\$\/\+\%\s]*$/i.test(text)) {
-          throw new Error('CODE39 supports uppercase letters, numbers, and symbols: -.$/+%');
-        }
-        break;
-
-      // ITF 系列
-      case BarcodeFormat.ITF:
-        if (!/^\d+$/.test(text) || text.length < 2) {
-          throw new Error('ITF requires at least 2 digits and must be even length');
-        }
-        if (text.length % 2 !== 0) {
-          throw new Error('ITF requires an even number of digits');
-        }
-        break;
-
-      case BarcodeFormat.ITF14:
-        if (!/^\d{13,14}$/.test(text)) {
-          throw new Error('ITF14 requires 13 or 14 digits');
-        }
-        // JsBarcode 会自动处理校验位计算，不需要手动验证偶数位
-        break;
-
-      // MSI 系列
-      case BarcodeFormat.MSI:
-      case BarcodeFormat.MSI10:
-      case BarcodeFormat.MSI11:
-      case BarcodeFormat.MSI1010:
-      case BarcodeFormat.MSI1110:
-        if (!/^\d+$/.test(text)) {
-          throw new Error('MSI formats require only digits');
-        }
-        break;
-
-      // Pharmacode
-      case BarcodeFormat.pharmacode:
-        if (!/^\d+$/.test(text) || parseInt(text) < 3 || parseInt(text) > 131070) {
-          throw new Error('Pharmacode requires a number between 3 and 131070');
-        }
-        break;
-
-      // Codabar
-      case BarcodeFormat.codabar:
-        // Codabar 支持数字和 -$:/.+ ABCD 四个字符作为开始/结束符
-        if (!/^[0-9\-\$\:\/\.\+ABCD]+$/i.test(text)) {
-          throw new Error('Codabar supports digits, -$:/.+ and ABCD start/stop characters');
-        }
-        break;
-
-      default:
-        throw new Error(`Unsupported barcode format: ${selectedFormat}`);
-    }
-  }
-
   
+  
+
   /**
    * 生成文件名
    * @param text 文本内容
