@@ -4,6 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent } from '@teable/ui-lib/dist/shadcn/ui/card';
 import { useViews } from '../../hooks/useViews';
 import { IConverterConfig } from './types';
+import { IView } from '../../types';
 
 interface IViewSelectorProps {
   config: IConverterConfig;
@@ -20,6 +21,9 @@ export function ViewSelector({
 }: IViewSelectorProps) {
   const { t } = useTranslation('common');
   const { data: views = [], isLoading: viewsLoading } = useViews();
+  
+  // 确保 views 是数组类型
+  const viewsArray: IView[] = Array.isArray(views) ? views : [];
 
   const handleViewChange = (viewId: string) => {
     const finalViewId = viewId === 'all' ? undefined : viewId;
@@ -50,7 +54,7 @@ export function ViewSelector({
   }
 
   // 无视图
-  if (views.length === 0) {
+  if (viewsArray.length === 0) {
     return (
       <div className={`space-y-4 ${className}`}>
         <div className="text-sm text-destructive">
@@ -78,7 +82,7 @@ export function ViewSelector({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{t('converter.selectView')}</SelectItem>
-              {views.map((view) => (
+              {viewsArray.map((view) => (
                 <SelectItem key={view.id} value={view.id}>
                   <div className="flex items-center gap-2">
                     <span>{view.name}</span>
