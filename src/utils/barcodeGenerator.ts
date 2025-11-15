@@ -102,8 +102,6 @@ export interface IBarcodeOptions {
   ean128?: boolean | string;
   /** EAN/UPC系列: 扁平化编码 */
   flat?: boolean;
-  /** 添加最后字符 */
-  lastChar?: string;
 
   /** 验证回调函数 */
   valid?: (valid: boolean) => void;
@@ -160,7 +158,6 @@ const DEFAULT_BARCODE_OPTIONS: Required<IBarcodeOptions> = {
   fontOptions: '', // 无特殊字体样式
   ean128: false, // 默认不启用GS1-128编码
   flat: false, // 默认不扁平化编码
-  lastChar: '', // 默认不添加最后字符
 
   valid: () => {}
 };
@@ -369,11 +366,6 @@ export class BarcodeGenerator {
       default:
         // 其他格式忽略ean128和flat选项
         break;
-    }
-
-    // 通用选项（lastChar）适用于所有格式，但需要检查是否有实际值
-    if (options.lastChar) {
-      filtered.lastChar = options.lastChar;
     }
 
     return filtered;
