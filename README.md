@@ -1,18 +1,20 @@
-# Teable Link to Attachment Converter Plugin
+# Teable Barcode Generator Plugin
 
-A [Teable](https://teable.ai) plugin for converting web links in tables to downloadable attachments.
+A powerful [Teable](https://teable.ai) plugin for generating barcodes from table data and saving them as downloadable attachments.
 
 ## ✨ Features
 
-- 🔗 **Smart Link Detection** - Automatically identify URL links in table fields
-- 📎 **Attachment Conversion** - Convert links to downloadable files in Teable attachment fields
-- 🎯 **Field Mapping** - Flexible selection of source link fields and target attachment fields
-- 📊 **Batch Processing** - Process multiple links across multiple records at once
-- 🔧 **Progress Tracking** - Real-time display of conversion progress and results
+- 📊 **Multiple Barcode Formats** - Support for 20+ barcode formats including CODE128, EAN, UPC, CODE39, ITF, MSI, and more
+- 🎨 **Customizable Appearance** - Full control over width, height, colors, margins, and text display
+- 📝 **Text Customization** - Customize font, size, style, position, and alignment of barcode text
+- 🔄 **Batch Generation** - Generate barcodes for multiple records at once
+- 👁️ **Live Preview** - Real-time preview of barcode appearance before generation
+- 🎯 **Field Mapping** - Flexible selection of source data fields and target attachment fields
+- 📈 **Progress Tracking** - Real-time display of generation progress and statistics
 - 🎨 **Theme Support** - Complete light/dark mode compatibility with automatic theme detection
 - 🌍 **Internationalization** - Full i18n support (English/Chinese)
 - 📱 **Responsive Design** - Optimized for all screen sizes
-- ⚡ **Performance Optimized** - Efficient data fetching with React Query
+- ⚡ **Performance Optimized** - Efficient data processing with React Query
 - 🛡️ **Error Handling** - Comprehensive error reporting and user feedback
 - 🔌 **Teable Integration** - Seamless integration with Teable tables and fields
 
@@ -30,6 +32,9 @@ A [Teable](https://teable.ai) plugin for converting web links in tables to downl
 ### State Management
 - **@tanstack/react-query 4.36.1** - Server state management and caching
 - **React Context** - Client-side state management
+
+### Barcode Generation
+- **jsbarcode 3.12.1** - JavaScript barcode generation library
 
 ### Teable Ecosystem
 - `@teable/sdk` - Plugin bridge, UI configuration, utilities
@@ -70,20 +75,53 @@ npm start
 
 ## 📖 Usage
 
-1. **Select Link Field** - Choose the text field containing web links
-2. **Select Attachment Field** - Choose the field to store converted attachments
-3. **Start Conversion** - Click "Start Conversion" to process the links
-4. **View Results** - After conversion, the attachment field will contain downloadable files
+1. **Select View** - Choose the view containing records to process
+2. **Select Data Source Field** - Choose the field containing data for barcode generation (text or number field)
+3. **Select Attachment Field** - Choose the attachment field to store generated barcodes
+4. **Configure Barcode** - Customize barcode format, appearance, and text settings
+5. **Preview** - Review the barcode appearance in real-time
+6. **Generate** - Click "Generate Barcode" to process all records
+7. **View Results** - Generated barcodes are saved as images in the attachment field
 
 ## 🔧 Configuration Options
 
-### Field Settings
-- **URL Field** - Source field containing web links
-- **Attachment Field** - Target field for storing conversion results
+### Basic Settings
 
-### Conversion Options
-- **Error Handling** - Whether to continue processing other links when encountering errors
-- **Preserve Original Links** - Whether to save original URLs in attachment comments
+- **Barcode Type** - Choose from 20+ barcode formats:
+  - CODE128 series (CODE128, CODE128A, CODE128B, CODE128C)
+  - EAN series (EAN-13, EAN-8, EAN-5, EAN-2)
+  - UPC series (UPC-A, UPC-E)
+  - CODE39
+  - ITF series (ITF, ITF-14)
+  - MSI series (MSI, MSI10, MSI11, MSI1010, MSI1110)
+  - Pharmacode
+  - Codabar
+- **File Format** - PNG or SVG output format
+- **GS1-128** - Enable GS1-128 encoding for CODE128 series
+- **Compact Format** - Enable flat encoding for EAN/UPC series
+
+### Appearance Settings
+
+- **Width** - Barcode line width (1-10px)
+- **Height** - Barcode height (50-200px)
+- **Barcode Color** - Customize barcode line color
+- **Background Color** - Customize background color
+
+### Text Settings
+
+- **Display Text** - Toggle text display below/above barcode
+- **Custom Text** - Override default text (leave empty to use barcode data)
+- **Font** - Choose from multiple font families
+- **Font Style** - Default, Bold, Italic, or Bold Italic
+- **Font Size** - Adjustable from 10-40px
+- **Text Position** - Top or Bottom
+- **Text Alignment** - Left, Center, or Right
+- **Text Margin** - Spacing between barcode and text (0-20px)
+
+### Margin Settings
+
+- **Uniform Margin** - Set all margins at once (0-50px)
+- **Individual Margins** - Customize top, bottom, left, and right margins separately
 
 ## 🌐 Internationalization
 
@@ -99,14 +137,14 @@ Translation files are located in the `src/locales/` directory.
 src/
 ├── app/                 # Next.js App Router
 ├── components/          # React components
-│   ├── SimpleLinkConverter.tsx  # Main converter component
+│   ├── SimpleLinkConverter.tsx  # Main barcode generator component
 │   └── ...            # Other UI components
 ├── hooks/              # React Hooks
 ├── lib/                # Utility libraries
 ├── locales/            # Internationalization files
-├── services/           # Business logic
 ├── types/              # TypeScript type definitions
 └── utils/              # Utility functions
+    └── barcodeGenerator.ts  # Barcode generation logic
 ```
 
 ## 🔌 Teable Plugin Architecture
@@ -123,6 +161,32 @@ Uses `@teable/sdk`'s `usePluginBridge()` hook for:
 - Authentication via `getSelfTempToken()`
 - Real-time event listening
 
+## 🎯 Supported Barcode Formats
+
+### CODE128 Series
+- **CODE128** - General purpose, supports full ASCII
+- **CODE128A** - Uppercase letters, numbers, and control characters
+- **CODE128B** - Uppercase and lowercase letters, numbers
+- **CODE128C** - Numbers only (compressed)
+
+### EAN Series
+- **EAN-13** - 13-digit European Article Number
+- **EAN-8** - 8-digit European Article Number
+- **EAN-5** - 5-digit supplement
+- **EAN-2** - 2-digit supplement
+
+### UPC Series
+- **UPC-A** - 12-digit Universal Product Code
+- **UPC-E** - 6-digit compressed UPC
+
+### Other Formats
+- **CODE39** - Alphanumeric barcode
+- **ITF** - Interleaved 2 of 5
+- **ITF-14** - 14-digit ITF
+- **MSI** - Modified Plessey variants
+- **Pharmacode** - Pharmaceutical binary code
+- **Codabar** - Self-checking barcode
+
 ## 🤝 Contributing
 
 Issues and Pull Requests are welcome to improve this plugin!
@@ -135,3 +199,4 @@ MIT License
 
 - [Teable Official Website](https://teable.ai)
 - [Next.js Documentation](https://nextjs.org/docs)
+- [JsBarcode Documentation](https://github.com/lindell/JsBarcode)
