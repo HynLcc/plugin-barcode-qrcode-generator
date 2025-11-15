@@ -134,7 +134,7 @@ export interface IBarcodeResult {
 /**
  * 默认条码配置
  */
-const DEFAULT_BARCODE_OPTIONS: Required<IBarcodeOptions> = {
+const DEFAULT_BARCODE_OPTIONS: Omit<Required<IBarcodeOptions>, 'valid'> = {
   format: BarcodeFormat.CODE128,
   outputFormat: OutputFormat.PNG,
   width: 2,
@@ -157,9 +157,9 @@ const DEFAULT_BARCODE_OPTIONS: Required<IBarcodeOptions> = {
   font: 'monospace', // JsBarcode默认字体
   fontOptions: '', // 无特殊字体样式
   ean128: false, // 默认不启用GS1-128编码
-  flat: false, // 默认不扁平化编码
+  flat: false // 默认不扁平化编码
 
-  valid: () => {}
+  // 注意：不设置 valid 回调，让 JsBarcode 在数据无效时抛出异常
 };
 
 /**
@@ -204,15 +204,16 @@ export class BarcodeGenerator {
       // 过滤格式特定选项，只保留适用的选项
       const filteredOptions = this.filterFormatSpecificOptions(mergedOptions);
 
-      // 添加校验回调，使用JsBarcode内置的验证
-      const optionsWithValidation = {
-        ...filteredOptions,
-        valid: (valid: boolean) => {
-          if (!valid) {
-            throw new Error(`Invalid data for ${options.format} format: "${text}"`);
-          }
-        }
-      };
+      // 确保不提供 valid 回调，完全依赖 JsBarcode 的验证机制
+      // 根据 JsBarcode 源码：如果没有提供 valid 回调，当 !encoder.valid() 时会抛出 InvalidInputException
+      // 这样可以阻止无效数据的条码生成
+      // 如果提供了 valid 回调，JsBarcode 会调用回调而不是抛出异常，不会阻止生成
+      const { valid: _valid, ...optionsForGeneration } = filteredOptions;
+      
+      // 确保 optionsForGeneration 中不包含 valid
+      if ('valid' in optionsForGeneration) {
+        delete (optionsForGeneration as any).valid;
+      }
 
       
       const outputFormat = mergedOptions.outputFormat || OutputFormat.PNG;
@@ -225,8 +226,9 @@ export class BarcodeGenerator {
         const svgElement = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
 
         try {
-          // 生成 SVG 条码（使用带验证的选项）
-          JsBarcode(svgElement, text, optionsWithValidation);
+          // 生成 SVG 条码
+          // 如果没有提供 valid 回调，JsBarcode 会在数据无效时抛出异常，阻止生成
+          JsBarcode(svgElement, text, optionsForGeneration);
 
           // 转换为 SVG 字符串
           const svgString = new XMLSerializer().serializeToString(svgElement);
@@ -240,6 +242,9 @@ export class BarcodeGenerator {
           // 生成文件名
           finalFileName = fileName || this.generateFileName(text, mergedOptions.format, 'svg');
 
+        } catch (jsbarcodeError) {
+          // 捕获 JsBarcode 抛出的异常（无效数据会抛出 InvalidInputException）
+          throw jsbarcodeError; // 重新抛出异常
         } finally {
           // 清理 SVG 元素
           svgElement.remove();
@@ -250,8 +255,9 @@ export class BarcodeGenerator {
         canvas.id = `barcode-canvas-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
         try {
-          // 生成条码（使用带验证的选项）
-          JsBarcode(canvas, text, optionsWithValidation);
+          // 生成条码
+          // 如果没有提供 valid 回调，JsBarcode 会在数据无效时抛出异常，阻止生成
+          JsBarcode(canvas, text, optionsForGeneration);
 
           // 转换为Blob
           blob = await new Promise<Blob>((resolve, reject) => {
@@ -271,6 +277,9 @@ export class BarcodeGenerator {
           // 生成文件名
           finalFileName = fileName || this.generateFileName(text, mergedOptions.format, 'png');
 
+        } catch (jsbarcodeError) {
+          // 捕获 JsBarcode 抛出的异常（无效数据会抛出 InvalidInputException）
+          throw jsbarcodeError; // 重新抛出异常
         } finally {
           // 清理canvas元素
           canvas.remove();
@@ -334,10 +343,17 @@ export class BarcodeGenerator {
    * @returns 过滤后的选项配置
    */
   private filterFormatSpecificOptions(options: IBarcodeOptions): IBarcodeOptions {
-    const { format, ean128, flat, ...commonOptions } = options;
+    // 解构排除 format, ean128, flat, valid
+    const { format, ean128, flat, valid, ...commonOptions } = options;
 
-    // 创建基础选项（排除格式特定选项）
+    // 创建基础选项（排除格式特定选项和 valid 回调）
+    // 不提供 valid 回调，让 JsBarcode 在数据无效时抛出异常
     const filtered: IBarcodeOptions = { ...commonOptions };
+    
+    // 确保 filtered 中不包含 valid（双重保险）
+    if ('valid' in filtered) {
+      delete filtered.valid;
+    }
 
     // 根据格式类型添加特定选项
     switch (format) {
@@ -373,6 +389,7 @@ export class BarcodeGenerator {
 
   
   
+
   /**
    * 生成文件名
    * @param text 文本内容
