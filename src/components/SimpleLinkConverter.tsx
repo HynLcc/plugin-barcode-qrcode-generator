@@ -13,6 +13,7 @@ import { Separator } from '@teable/ui-lib/dist/shadcn/ui/separator';
 import { Slider } from '@teable/ui-lib/dist/shadcn/ui/slider';
 import { Switch } from '@teable/ui-lib/dist/shadcn/ui/switch';
 import { Input } from '@teable/ui-lib/dist/shadcn/ui/input';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@teable/ui-lib/dist/shadcn/ui/collapsible';
 import { toast } from 'sonner';
 import {
   AlertCircle,
@@ -133,7 +134,8 @@ export function SimpleLinkConverter() {
   const [isConverting, setIsConverting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [stats, setStats] = useState({ success: 0, failed: 0, processing: 0 });
-  const [isAdvancedOptionsOpen, setIsAdvancedOptionsOpen] = useState(false);
+  const [isBasicConfigOpen, setIsBasicConfigOpen] = useState(true);
+  const [isOptionsPreviewOpen, setIsOptionsPreviewOpen] = useState(true);
   
   // 预览相关状态
   const [previewDataURL, setPreviewDataURL] = useState<string | null>(null);
@@ -612,16 +614,27 @@ export function SimpleLinkConverter() {
   }
 
   return (
-    <div className="w-full max-w-2xl mx-auto p-6 space-y-6">
-      {/* 条码配置 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <Settings className="w-5 h-5" />
-            条码配置
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
+    <div className="w-full max-w-2xl mx-auto p-6 space-y-4">
+        {/* 第一部分：基础配置（条码格式、输出格式、数据源） */}
+        <Collapsible open={isBasicConfigOpen} onOpenChange={setIsBasicConfigOpen}>
+          <Card>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover:bg-gray-50 transition-colors">
+                <CardTitle className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <Settings className="w-5 h-5" />
+                    基础配置
+                  </div>
+                  {isBasicConfigOpen ? (
+                    <ChevronUp className="w-5 h-5 text-gray-500" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-gray-500" />
+                  )}
+                </CardTitle>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
             {/* 条码格式 */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-gray-700">条码格式</label>
@@ -646,7 +659,7 @@ export function SimpleLinkConverter() {
                 <SelectContent>
                   {supportedFormats.map((format) => (
                     <SelectItem key={format.value} value={format.value}>
-                      {format.label} - {format.description}
+                      {format.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -665,83 +678,218 @@ export function SimpleLinkConverter() {
                   <SelectValue placeholder="选择输出格式" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={OutputFormat.PNG}>PNG - 位图格式，适合打印</SelectItem>
-                  <SelectItem value={OutputFormat.SVG}>SVG - 矢量格式，文件更小</SelectItem>
+                  <SelectItem value={OutputFormat.PNG}>PNG</SelectItem>
+                  <SelectItem value={OutputFormat.SVG}>SVG</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {/* 尺寸设置 */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">宽度: {barcodeConfig.width}px</label>
-                <Slider
-                  value={[barcodeConfig.width]}
-                  onValueChange={([value]) => setBarcodeConfig(prev => ({ ...prev, width: value as number }))}
-                  max={10}
-                  min={1}
-                  step={1}
-                  disabled={isConverting}
-                  className="w-full"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">高度: {barcodeConfig.height}px</label>
-                <Slider
-                  value={[barcodeConfig.height]}
-                  onValueChange={([value]) => setBarcodeConfig(prev => ({ ...prev, height: value as number }))}
-                  max={200}
-                  min={50}
-                  step={10}
-                  disabled={isConverting}
-                  className="w-full"
-                />
-              </div>
-            </div>
+                {/* 数据源 */}
+                <div className="space-y-4 pt-4 border-t">
+                  {/* 选择视图 */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      <RequireCom />
+                      {t('converter.selectView')}
+                    </label>
+                    <Select value={selectedViewId} onValueChange={setSelectedViewId} disabled={isConverting}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={t('converter.selectViewPlaceholder')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {viewsArray.length === 0 ? (
+                          <SelectItem value="no-views" disabled>{t('converter.noViewsFound')}</SelectItem>
+                        ) : (
+                          viewsArray.map((view) => (
+                            <SelectItem key={view.id} value={view.id}>
+                              <div className="flex items-center gap-2">
+                                {getViewIcon(view.type)}
+                                <span>{view.name}</span>
+                              </div>
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-            {/* 颜色设置 */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">条码颜色</label>
-                <input
-                  type="color"
-                  value={barcodeConfig.lineColor}
-                  onChange={(e) => setBarcodeConfig(prev => ({ ...prev, lineColor: e.target.value }))}
-                  disabled={isConverting}
-                  className="w-full h-10 rounded border"
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">背景颜色</label>
-                <input
-                  type="color"
-                  value={barcodeConfig.background}
-                  onChange={(e) => setBarcodeConfig(prev => ({ ...prev, background: e.target.value }))}
-                  disabled={isConverting}
-                  className="w-full h-10 rounded border"
-                />
-              </div>
-            </div>
+                  {/* 选择源字段 */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      <RequireCom />
+                      选择数据字段
+                    </label>
+                    <Select value={selectedUrlField} onValueChange={setSelectedUrlField} disabled={isConverting}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={t('converter.selectFieldPlaceholder')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sourceFields.length === 0 ? (
+                          <SelectItem value="no-fields" disabled>
+                            未找到文本或数字字段
+                          </SelectItem>
+                        ) : (
+                          sourceFields.map((field) => (
+                            <SelectItem key={field.id} value={field.id}>
+                              <div className="flex items-center gap-2">
+                                {getFieldIcon(field.type, field.cellValueType)}
+                                <span>{field.name}</span>
+                                <span className="text-[13px] text-gray-500 ml-1">
+                                  {field.cellValueType === 'number' ? '(数字)' : '(文本)'}
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-            {/* 新增的JsBarcode选项 */}
-            <Separator />
-            <div className="space-y-4">
-              <button
-                type="button"
-                onClick={() => setIsAdvancedOptionsOpen(!isAdvancedOptionsOpen)}
-                className="flex items-center justify-between w-full text-left hover:bg-gray-50 -mx-4 px-4 py-2 rounded transition-colors"
-                disabled={isConverting}
-              >
-                <h3 className="text-sm font-medium text-gray-900">高级选项</h3>
-                {isAdvancedOptionsOpen ? (
-                  <ChevronUp className="w-5 h-5 text-gray-500" />
-                ) : (
-                  <ChevronDown className="w-5 h-5 text-gray-500" />
-                )}
-              </button>
+                  {/* 选择附件字段 */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">
+                      <RequireCom />
+                      {t('converter.selectAttachmentField')}
+                    </label>
+                    <Select value={selectedAttachmentField} onValueChange={setSelectedAttachmentField} disabled={isConverting}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={t('converter.selectFieldPlaceholder')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {attachmentFields.length === 0 ? (
+                          <SelectItem value="no-fields" disabled>{t('converter.noAttachmentFieldsFound')}</SelectItem>
+                        ) : (
+                          attachmentFields.map((field) => (
+                            <SelectItem key={field.id} value={field.id}>
+                              <div className="flex items-center gap-2">
+                                <File className="w-4 h-4" />
+                                <span>{field.name}</span>
+                              </div>
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-              {isAdvancedOptionsOpen && (
-                <div className="space-y-4 pt-2">
+                  {/* 转换进度 */}
+                  {(isConverting || stats.success > 0 || stats.failed > 0) && (
+                    <div className="space-y-3 p-4 border rounded-lg bg-gray-50">
+                      <div className="text-sm font-medium text-gray-700 flex items-center gap-1">
+                        条码生成进度
+                      </div>
+                      {isConverting && (
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-[13px] text-gray-600 mb-1">
+                            <span>{t('converter.progress')}</span>
+                            <span>{Math.round(progress)}%</span>
+                          </div>
+                          <Progress value={progress} className="h-2" />
+                        </div>
+                      )}
+                      <div className="flex gap-6 text-[13px]">
+                        <span className="text-green-600">{t('converter.successful')}: {stats.success}{t('converter.countUnit')}</span>
+                        {stats.failed > 0 && <span className="text-red-600">{t('converter.failed')}: {stats.failed}{t('converter.countUnit')}</span>}
+                        {stats.processing > 0 && <span className="text-blue-600">{t('converter.processing')}: {stats.processing}{t('converter.countUnit')}</span>}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 开始转换按钮 */}
+                  <Button
+                    onClick={handleConvert}
+                    disabled={!isConfigValid || isConverting}
+                    className="w-full"
+                    size="lg"
+                  >
+                    {isConverting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        生成条码中...
+                      </>
+                    ) : (
+                      '开始生成条码'
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+
+        {/* 第二部分：条码选项+预览 */}
+        <Collapsible open={isOptionsPreviewOpen} onOpenChange={setIsOptionsPreviewOpen}>
+          <Card>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="cursor-pointer hover:bg-gray-50 transition-colors">
+                <CardTitle className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <Settings className="w-5 h-5" />
+                    条码选项与预览
+                  </div>
+                  {isOptionsPreviewOpen ? (
+                    <ChevronUp className="w-5 h-5 text-gray-500" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-gray-500" />
+                  )}
+                </CardTitle>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-4">
+                {/* 尺寸设置 */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">宽度: {barcodeConfig.width}px</label>
+                    <Slider
+                      value={[barcodeConfig.width]}
+                      onValueChange={([value]) => setBarcodeConfig(prev => ({ ...prev, width: value as number }))}
+                      max={10}
+                      min={1}
+                      step={1}
+                      disabled={isConverting}
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">高度: {barcodeConfig.height}px</label>
+                    <Slider
+                      value={[barcodeConfig.height]}
+                      onValueChange={([value]) => setBarcodeConfig(prev => ({ ...prev, height: value as number }))}
+                      max={200}
+                      min={50}
+                      step={10}
+                      disabled={isConverting}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+
+                {/* 颜色设置 */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">条码颜色</label>
+                    <input
+                      type="color"
+                      value={barcodeConfig.lineColor}
+                      onChange={(e) => setBarcodeConfig(prev => ({ ...prev, lineColor: e.target.value }))}
+                      disabled={isConverting}
+                      className="w-full h-10 rounded border"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">背景颜色</label>
+                    <input
+                      type="color"
+                      value={barcodeConfig.background}
+                      onChange={(e) => setBarcodeConfig(prev => ({ ...prev, background: e.target.value }))}
+                      disabled={isConverting}
+                      className="w-full h-10 rounded border"
+                    />
+                  </div>
+                </div>
+
+                <Separator />
                   {/* 显示文本值开关 */}
                   <div className="flex items-center space-x-3 pb-2 border-b">
                     <Switch
@@ -760,14 +908,13 @@ export function SimpleLinkConverter() {
                     <>
                       {/* 文本覆盖选项 */}
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">显示文本（覆盖原始数据）</label>
+                        <label className="text-sm font-medium text-gray-700">显示文本</label>
                         <Input
                           value={barcodeConfig.text}
                           onChange={(e) => setBarcodeConfig(prev => ({ ...prev, text: e.target.value }))}
                           placeholder="留空使用原始数据"
                           disabled={isConverting}
                         />
-                        <p className="text-[13px] text-gray-500">留空时将使用原始字段数据作为条码文本</p>
                       </div>
 
                       {/* 字体设置 */}
@@ -907,7 +1054,6 @@ export function SimpleLinkConverter() {
                         disabled={isConverting}
                         className="w-full"
                       />
-                      <p className="text-[13px] text-gray-500">设置统一的边距，可被各方向边距覆盖</p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -1036,9 +1182,8 @@ export function SimpleLinkConverter() {
                               onCheckedChange={(checked) => setBarcodeConfig(prev => ({ ...prev, ean128: checked }))}
                               disabled={isConverting}
                             />
-                            <span className="text-[13px] text-gray-600">启用GS1-128/EAN-128编码</span>
+                            <span className="text-[13px] text-gray-600">启用</span>
                           </div>
-                          <p className="text-[13px] text-gray-500">用于国际标准物流和商品编码</p>
                         </div>
                       )}
 
@@ -1057,214 +1202,75 @@ export function SimpleLinkConverter() {
                               onCheckedChange={(checked) => setBarcodeConfig(prev => ({ ...prev, flat: checked }))}
                               disabled={isConverting}
                             />
-                            <span className="text-[13px] text-gray-600">启用扁平化编码</span>
+                            <span className="text-[13px] text-gray-600">启用</span>
                           </div>
-                          <p className="text-[13px] text-gray-500">移除扩展条和分隔符，产生更紧凑的条码</p>
                         </div>
                       )}
                     </div>
                   )}
+
+                {/* 预览 */}
+                <Separator />
+                <div className="space-y-3">
+                  <h4 className="text-sm font-medium text-gray-800">预览</h4>
+                  {isGeneratingPreview ? (
+                    <div className="flex flex-col items-center justify-center py-8 space-y-2">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                      <p className="text-[13px] text-gray-600">正在生成预览...</p>
+                    </div>
+                  ) : previewError ? (
+                    <div className="flex flex-col items-center justify-center py-8 space-y-2">
+                      <AlertCircle className="w-8 h-8 text-red-500" />
+                      <p className="text-[13px] text-red-600">{previewError}</p>
+                      <p className="text-[13px] text-gray-500">预览文本: {barcodeConfig.text || getPreviewTextByFormat(barcodeConfig.format)}</p>
+                    </div>
+                  ) : previewDataURL ? (
+                    <div className="flex flex-col items-center space-y-3">
+                      <div className="relative p-4 bg-white border rounded-lg flex items-center justify-center min-h-[100px] overflow-hidden">
+                        {/* 当前显示的图片 */}
+                        {previewDataURL && (
+                          <img 
+                            ref={previewImageRef}
+                            src={previewDataURL} 
+                            alt="条码预览" 
+                            className={`max-w-full h-auto transition-opacity duration-300 ease-in-out ${
+                              isPreviewFading ? 'opacity-0' : 'opacity-100'
+                            }`}
+                            style={{ maxHeight: '200px' }}
+                          />
+                        )}
+                        {/* 下一张预加载的图片 */}
+                        {nextPreviewDataURL && (
+                          <img 
+                            src={nextPreviewDataURL} 
+                            alt="条码预览" 
+                            className={`absolute inset-0 p-4 max-w-full h-auto transition-opacity duration-300 ease-in-out ${
+                              isPreviewFading ? 'opacity-100' : 'opacity-0'
+                            }`}
+                            style={{ maxHeight: '200px', objectFit: 'contain' }}
+                          />
+                        )}
+                        {/* 加载指示器 */}
+                        {isGeneratingPreview && !nextPreviewDataURL && (
+                          <div className="absolute inset-0 flex items-center justify-center z-10 bg-white bg-opacity-50 backdrop-blur-sm">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-[13px] text-gray-500">
+                        预览文本: <span className="font-mono">{barcodeConfig.text || getPreviewTextByFormat(barcodeConfig.format)}</span>
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-8">
+                      <p className="text-[13px] text-gray-500">配置条码参数以查看预览</p>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-      {/* 预览区域 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-sm">
-            <span>📊</span>
-            预览
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isGeneratingPreview ? (
-            <div className="flex flex-col items-center justify-center py-8 space-y-2">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <p className="text-[13px] text-gray-600">正在生成预览...</p>
-            </div>
-          ) : previewError ? (
-            <div className="flex flex-col items-center justify-center py-8 space-y-2">
-              <AlertCircle className="w-8 h-8 text-red-500" />
-              <p className="text-[13px] text-red-600">{previewError}</p>
-              <p className="text-[13px] text-gray-500">预览文本: {barcodeConfig.text || getPreviewTextByFormat(barcodeConfig.format)}</p>
-            </div>
-          ) : previewDataURL ? (
-            <div className="flex flex-col items-center space-y-3">
-              <div className="relative p-4 bg-white border rounded-lg flex items-center justify-center min-h-[100px] overflow-hidden">
-                {/* 当前显示的图片 */}
-                {previewDataURL && (
-                  <img 
-                    ref={previewImageRef}
-                    src={previewDataURL} 
-                    alt="条码预览" 
-                    className={`max-w-full h-auto transition-opacity duration-300 ease-in-out ${
-                      isPreviewFading ? 'opacity-0' : 'opacity-100'
-                    }`}
-                    style={{ maxHeight: '200px' }}
-                  />
-                )}
-                {/* 下一张预加载的图片 */}
-                {nextPreviewDataURL && (
-                  <img 
-                    src={nextPreviewDataURL} 
-                    alt="条码预览" 
-                    className={`absolute inset-0 p-4 max-w-full h-auto transition-opacity duration-300 ease-in-out ${
-                      isPreviewFading ? 'opacity-100' : 'opacity-0'
-                    }`}
-                    style={{ maxHeight: '200px', objectFit: 'contain' }}
-                  />
-                )}
-                {/* 加载指示器 */}
-                {isGeneratingPreview && !nextPreviewDataURL && (
-                  <div className="absolute inset-0 flex items-center justify-center z-10 bg-white bg-opacity-50 backdrop-blur-sm">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                  </div>
-                )}
-              </div>
-              <p className="text-[13px] text-gray-500">
-                预览文本: <span className="font-mono">{barcodeConfig.text || getPreviewTextByFormat(barcodeConfig.format)}</span>
-              </p>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-8">
-              <p className="text-[13px] text-gray-500">配置条码参数以查看预览</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Separator />
-
-      {/* 选择视图 */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-gray-700">
-          <RequireCom />
-          {t('converter.selectView')}
-        </label>
-        <Select value={selectedViewId} onValueChange={setSelectedViewId} disabled={isConverting}>
-          <SelectTrigger>
-            <SelectValue placeholder={t('converter.selectViewPlaceholder')} />
-          </SelectTrigger>
-          <SelectContent>
-            {viewsArray.length === 0 ? (
-              <SelectItem value="no-views" disabled>{t('converter.noViewsFound')}</SelectItem>
-            ) : (
-              viewsArray.map((view) => (
-                <SelectItem key={view.id} value={view.id}>
-                  <div className="flex items-center gap-2">
-                    {getViewIcon(view.type)}
-                    <span>{view.name}</span>
-                  </div>
-                </SelectItem>
-              ))
-            )}
-          </SelectContent>
-        </Select>
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
       </div>
-
-      {/* 选择源字段 */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-gray-700">
-          <RequireCom />
-          选择数据字段
-        </label>
-        <Select value={selectedUrlField} onValueChange={setSelectedUrlField} disabled={isConverting}>
-          <SelectTrigger>
-            <SelectValue placeholder={t('converter.selectFieldPlaceholder')} />
-          </SelectTrigger>
-          <SelectContent>
-            {sourceFields.length === 0 ? (
-              <SelectItem value="no-fields" disabled>
-                未找到文本或数字字段
-              </SelectItem>
-            ) : (
-              sourceFields.map((field) => (
-                <SelectItem key={field.id} value={field.id}>
-                  <div className="flex items-center gap-2">
-                    {getFieldIcon(field.type, field.cellValueType)}
-                    <span>{field.name}</span>
-                    <span className="text-[13px] text-gray-500 ml-1">
-                      {field.cellValueType === 'number' ? '(数字)' : '(文本)'}
-                    </span>
-                  </div>
-                </SelectItem>
-              ))
-            )}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* 选择附件字段 */}
-      <div className="space-y-2">
-        <label className="text-sm font-medium text-gray-700">
-          <RequireCom />
-          {t('converter.selectAttachmentField')}
-        </label>
-        <Select value={selectedAttachmentField} onValueChange={setSelectedAttachmentField} disabled={isConverting}>
-          <SelectTrigger>
-            <SelectValue placeholder={t('converter.selectFieldPlaceholder')} />
-          </SelectTrigger>
-          <SelectContent>
-            {attachmentFields.length === 0 ? (
-              <SelectItem value="no-fields" disabled>{t('converter.noAttachmentFieldsFound')}</SelectItem>
-            ) : (
-              attachmentFields.map((field) => (
-                <SelectItem key={field.id} value={field.id}>
-                  <div className="flex items-center gap-2">
-                    <File className="w-4 h-4" />
-                    <span>{field.name}</span>
-                  </div>
-                </SelectItem>
-              ))
-            )}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* 开始转换按钮 */}
-      <Button
-        onClick={handleConvert}
-        disabled={!isConfigValid || isConverting}
-        className="w-full"
-        size="lg"
-      >
-        {isConverting ? (
-          <>
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-            生成条码中...
-          </>
-        ) : (
-          <>
-            <div className="w-4 h-4 mr-2 flex items-center justify-center">📊</div>
-            开始生成条码
-          </>
-        )}
-      </Button>
-
-      {/* 转换进度 */}
-      {(isConverting || stats.success > 0 || stats.failed > 0) && (
-        <div className="space-y-3 p-4 border rounded-lg bg-gray-50">
-          <div className="text-sm font-medium text-gray-700 flex items-center gap-1">
-            📊 条码生成进度
-          </div>
-          {isConverting && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-[13px] text-gray-600 mb-1">
-                <span>{t('converter.progress')}</span>
-                <span>{Math.round(progress)}%</span>
-              </div>
-              <Progress value={progress} className="h-2" />
-            </div>
-          )}
-          <div className="flex gap-6 text-[13px]">
-            <span className="text-green-600">{t('converter.successful')}: {stats.success}{t('converter.countUnit')}</span>
-            {stats.failed > 0 && <span className="text-red-600">{t('converter.failed')}: {stats.failed}{t('converter.countUnit')}</span>}
-            {stats.processing > 0 && <span className="text-blue-600">{t('converter.processing')}: {stats.processing}{t('converter.countUnit')}</span>}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+    );
 }
