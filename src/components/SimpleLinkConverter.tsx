@@ -12,9 +12,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@teable/ui-lib/dist/sh
 import { Separator } from '@teable/ui-lib/dist/shadcn/ui/separator';
 import { Slider } from '@teable/ui-lib/dist/shadcn/ui/slider';
 import { Switch } from '@teable/ui-lib/dist/shadcn/ui/switch';
+import { Input } from '@teable/ui-lib/dist/shadcn/ui/input';
 import { toast } from 'sonner';
 import {
-  ArrowUp,
   AlertCircle,
   Sheet,
   ClipboardList as Form,
@@ -25,26 +25,13 @@ import {
   LongText,
   File,
   Settings,
-  Link,
   Hash,
 } from '@teable/icons';
 import * as openApi from '@teable/openapi';
 import { axios } from '@teable/openapi';
-import { AttachmentUploader, IUploadResult } from '@/utils/attachmentUploader';
-import { extractUrls } from '@/utils/urlExtractor';
 import { generateBarcode, BarcodeFormat, OutputFormat, IBarcodeResult, BarcodeGenerator } from '@/utils/barcodeGenerator';
 import { useViews } from '@/hooks/useViews';
 import { useGlobalUrlParams } from '@/hooks/useGlobalUrlParams';
-
-export type ConversionMode = 'url-to-attachment' | 'text-to-barcode';
-
-interface ConversionResult {
-  recordId: string;
-  urlCount: number;
-  successCount: number;
-  failedUrls: string[];
-  errors: string[];
-}
 
 interface BarcodeConfig {
   format: BarcodeFormat;
@@ -56,6 +43,15 @@ interface BarcodeConfig {
   lineColor: string;
   background: string;
   margin: number;
+
+  // 新增的JsBarcode选项
+  text: string;
+  font: string;
+  fontOptions: string;
+  ean128: boolean | string;
+  flat: boolean;
+  lastChar: string;
+  eotRender: boolean;
 }
 
 export function SimpleLinkConverter() {
@@ -70,7 +66,6 @@ export function SimpleLinkConverter() {
   const tokenRefreshTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Configuration states
-  const [conversionMode, setConversionMode] = useState<ConversionMode>('url-to-attachment');
   const [selectedViewId, setSelectedViewId] = useState<string>('');
   const [selectedUrlField, setSelectedUrlField] = useState<string>('');
   const [selectedAttachmentField, setSelectedAttachmentField] = useState<string>('');
@@ -88,7 +83,16 @@ export function SimpleLinkConverter() {
     fontSize: 20,
     lineColor: '#000000',
     background: '#FFFFFF',
-    margin: 10
+    margin: 10,
+
+    // 新增选项的默认值
+    text: '',
+    font: 'monospace',
+    fontOptions: '',
+    ean128: false,
+    flat: false,
+    lastChar: '',
+    eotRender: false
   });
 
   // 清理定时器的 useEffect
@@ -101,26 +105,6 @@ export function SimpleLinkConverter() {
       }
     };
   }, []);
-
-  // Initialize AttachmentUploader
-  const [uploader] = useState(() => new AttachmentUploader({
-    timeout: 30000,
-    retryCount: 2,
-    retryDelay: 1000,
-    preserveOriginalLink: true,
-    maxConcurrency: 3,
-    onComplete: (result: IUploadResult) => {
-      // Upload completed callback
-      if (process.env.NODE_ENV === 'development') {
-        console.log(`Upload completed for ${result.originalUrl}:`, result);
-      }
-    },
-    onError: (url: string, error: string) => {
-      // Upload error callback - always log errors
-      console.error(`Upload error for ${url}:`, error);
-    }
-  }));
-
 
   // Fetch table fields and records
   const { data: fields, isLoading: fieldsLoading } = useQuery({
@@ -139,7 +123,7 @@ export function SimpleLinkConverter() {
   // Filter fields by type (memoized for performance)
   const textFields = useMemo(() =>
     fields?.filter(field =>
-      field.type === 'longText' || field.type === 'singleLineText' || field.cellValueType === 'text'
+      field.type === 'longText' || field.type === 'singleLineText'
     ) || [],
     [fields]
   );
@@ -273,7 +257,7 @@ export function SimpleLinkConverter() {
       // 获取记录
       const recordsResponse = await openApi.getRecords(tableId, {
         viewId: selectedViewId,
-        fieldKeyType: 'id'
+        fieldKeyType: 'id' as any
       });
       const records = recordsResponse.data.records;
 
@@ -285,7 +269,7 @@ export function SimpleLinkConverter() {
         return;
       }
 
-      const results: ConversionResult[] = [];
+      const results: any[] = [];
       const totalRecords = records.length;
       let totalItems = 0;
 
@@ -302,7 +286,7 @@ export function SimpleLinkConverter() {
         }
 
         totalItems += 1;
-        const result: ConversionResult = {
+        const result: any = {
           recordId: record.id,
           urlCount: 1, // 对于条码，每个记录生成一个条码
           successCount: 0,
@@ -403,137 +387,6 @@ export function SimpleLinkConverter() {
   // 条码转换处理方法
   const handleConvert = async () => {
     return handleBarcodeConvert();
-  };
-
-  // URL转附件的转换方法
-  const handleUrlToAttachmentConvert = async () => {
-    if (!isConfigValid) {
-      toast.error(t('converter.configIncomplete'), {
-        description: t('converter.selectViewUrlAndAttachmentFields')
-      });
-      return;
-    }
-
-    if (!tableId) {
-      toast.error(t('converter.tableIdUnavailable'), {
-        description: t('converter.cannotGetTableInfo')
-      });
-      return;
-    }
-
-    setIsConverting(true);
-    setProgress(0);
-    setStats({ success: 0, failed: 0, processing: 0 });
-
-    try {
-      // 点击开始转换时才查询记录
-      const recordsResponse = await openApi.getRecords(tableId, {
-        viewId: selectedViewId,
-        fieldKeyType: 'id'
-      });
-      const records = recordsResponse.data.records;
-
-      if (!records || records.length === 0) {
-        toast.error(t('converter.noRecordsToProcess'), {
-          description: t('converter.noRecordsInView')
-        });
-        setIsConverting(false);
-        return;
-      }
-
-      const results: ConversionResult[] = [];
-      const totalRecords = records.length;
-      let totalUrls = 0;
-      let processedCount = 0;
-
-      for (let i = 0; i < records.length; i++) {
-        const record = records[i];
-        if (!record) continue;
-
-        // Try to get URL from field by ID first, then by field name
-        const text = (record.fields[selectedUrlField] || record.fields[urlField?.name || ''] || '') as string;
-        const urls = extractUrls(text);
-
-        if (urls.length === 0) continue;
-
-        totalUrls += urls.length;
-        const result: ConversionResult = {
-          recordId: record.id,
-          urlCount: urls.length,
-          successCount: 0,
-          failedUrls: [],
-          errors: []
-        };
-
-        // Process each URL using the new uploader
-        for (const url of urls) {
-          processedCount++;
-          setStats(prev => ({ ...prev, processing: totalUrls - processedCount }));
-          try {
-            // Use the new AttachmentUploader with fileUrl method
-            // 文件名由服务器端从 URL 或响应头中提取，不需要客户端处理
-            const uploadResult = await uploader.uploadFromUrl(
-              url,
-              '', // 不传递文件名，让服务器端处理
-              tableId,
-              record!.id,
-              selectedAttachmentField
-            );
-
-            if (uploadResult.success) {
-              result.successCount++;
-              setStats(prev => {
-                const newStats = { ...prev };
-                newStats.success += 1;
-                newStats.processing -= 1;
-                return newStats;
-              });
-            } else {
-              result.failedUrls.push(url);
-              result.errors.push(uploadResult.error || 'Upload failed');
-              setStats(prev => {
-                const newStats = { ...prev };
-                newStats.failed += 1;
-                newStats.processing -= 1;
-                return newStats;
-              });
-            }
-
-          } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            result.failedUrls.push(url);
-            result.errors.push(errorMessage);
-            setStats(prev => {
-              const newStats = { ...prev };
-              newStats.failed += 1;
-              newStats.processing -= 1;
-              return newStats;
-            });
-          }
-        }
-
-        if (result.urlCount > 0) {
-          results.push(result);
-        }
-
-        setProgress(((i + 1) / totalRecords) * 100);
-      }
-
-      // Show success message
-      toast.success(t('converter.conversionCompleted'), {
-        description: t('converter.foundLinksProcessed', { total: totalUrls, success: stats.success })
-      });
-
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Conversion error:', error);
-      toast.error(t('converter.conversionFailed'), {
-        description: `${t('converter.errorDuringConversion')}: ${errorMessage}`
-      });
-    } finally {
-      setIsConverting(false);
-      setStats(prev => ({ ...prev, processing: 0 }));
-    }
   };
 
   if (!tableId) {
@@ -676,9 +529,141 @@ export function SimpleLinkConverter() {
                 />
               </div>
             </div>
+
+            {/* 新增的JsBarcode选项 */}
+            <Separator />
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium text-gray-900">高级选项</h3>
+
+              {/* 文本覆盖选项 */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">显示文本（覆盖原始数据）</label>
+                <Input
+                  value={barcodeConfig.text}
+                  onChange={(e) => setBarcodeConfig(prev => ({ ...prev, text: e.target.value }))}
+                  placeholder="留空使用原始数据"
+                  disabled={isConverting}
+                />
+                <p className="text-xs text-gray-500">留空时将使用原始字段数据作为条码文本</p>
+              </div>
+
+              {/* 字体设置 */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">字体系列</label>
+                  <Select
+                    value={barcodeConfig.font}
+                    onValueChange={(value) => setBarcodeConfig(prev => ({ ...prev, font: value }))}
+                    disabled={isConverting}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="选择字体" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="monospace">Monospace</SelectItem>
+                      <SelectItem value="Arial">Arial</SelectItem>
+                      <SelectItem value="Helvetica">Helvetica</SelectItem>
+                      <SelectItem value="Times New Roman">Times New Roman</SelectItem>
+                      <SelectItem value="Courier New">Courier New</SelectItem>
+                      <SelectItem value="Verdana">Verdana</SelectItem>
+                      <SelectItem value="Georgia">Georgia</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-gray-700">字体样式</label>
+                  <Select
+                    value={barcodeConfig.fontOptions}
+                    onValueChange={(value) => setBarcodeConfig(prev => ({ ...prev, fontOptions: value }))}
+                    disabled={isConverting}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="选择样式" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">默认</SelectItem>
+                      <SelectItem value="bold">粗体</SelectItem>
+                      <SelectItem value="italic">斜体</SelectItem>
+                      <SelectItem value="bold italic">粗斜体</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* 格式特定选项 */}
+              <div className="space-y-4">
+                <h4 className="text-md font-medium text-gray-800">格式特定选项</h4>
+
+                {/* CODE128系列选项 */}
+                {(barcodeConfig.format === 'CODE128' ||
+                  barcodeConfig.format === 'CODE128A' ||
+                  barcodeConfig.format === 'CODE128B' ||
+                  barcodeConfig.format === 'CODE128C') && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">GS1-128编码</label>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={typeof barcodeConfig.ean128 === 'boolean' ? barcodeConfig.ean128 : barcodeConfig.ean128 === 'true'}
+                        onCheckedChange={(checked) => setBarcodeConfig(prev => ({ ...prev, ean128: checked }))}
+                        disabled={isConverting}
+                      />
+                      <span className="text-sm text-gray-600">启用GS1-128/EAN-128编码</span>
+                    </div>
+                    <p className="text-xs text-gray-500">用于国际标准物流和商品编码</p>
+                  </div>
+                )}
+
+                {/* EAN/UPC系列选项 */}
+                {(barcodeConfig.format === 'EAN13' ||
+                  barcodeConfig.format === 'EAN8' ||
+                  barcodeConfig.format === 'EAN5' ||
+                  barcodeConfig.format === 'EAN2' ||
+                  barcodeConfig.format === 'UPC' ||
+                  barcodeConfig.format === 'UPCE') && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">扁平化编码</label>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        checked={barcodeConfig.flat}
+                        onCheckedChange={(checked) => setBarcodeConfig(prev => ({ ...prev, flat: checked }))}
+                        disabled={isConverting}
+                      />
+                      <span className="text-sm text-gray-600">启用扁平化编码</span>
+                    </div>
+                    <p className="text-xs text-gray-500">移除扩展条和分隔符，产生更紧凑的条码</p>
+                  </div>
+                )}
+
+                {/* 通用选项 */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">最后字符</label>
+                    <Input
+                      value={barcodeConfig.lastChar}
+                      onChange={(e) => setBarcodeConfig(prev => ({ ...prev, lastChar: e.target.value }))}
+                      placeholder="可选"
+                      disabled={isConverting}
+                      maxLength={1}
+                    />
+                    <p className="text-xs text-gray-500">添加到条码末尾的字符</p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">EOT字符渲染</label>
+                    <div className="flex items-center space-x-2 mt-3">
+                      <Switch
+                        checked={barcodeConfig.eotRender}
+                        onCheckedChange={(checked) => setBarcodeConfig(prev => ({ ...prev, eotRender: checked }))}
+                        disabled={isConverting}
+                      />
+                      <span className="text-sm text-gray-600">渲染EOT字符</span>
+                    </div>
+                    <p className="text-xs text-gray-500">显示传输结束字符</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
-      }
 
       <Separator />
 
@@ -814,3 +799,4 @@ export function SimpleLinkConverter() {
     </div>
   );
 }
+
