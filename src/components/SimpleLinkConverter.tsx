@@ -44,7 +44,7 @@ interface BarcodeConfig {
   outputFormat: OutputFormat;
   width: number;
   height: number;
-  displayValue: boolean;
+  displayValue?: boolean;
   fontSize: number;
   lineColor: string;
   background: string;
@@ -65,7 +65,6 @@ interface BarcodeConfig {
   // 特定格式选项
   ean128: boolean | string;
   flat: boolean;
-  lastChar: string;
 }
 
 export function SimpleLinkConverter() {
@@ -94,7 +93,7 @@ export function SimpleLinkConverter() {
     outputFormat: OutputFormat.PNG,
     width: 2,
     height: 100,
-    displayValue: true,
+    displayValue: false,
     fontSize: 20,
     lineColor: '#000000',
     background: '#FFFFFF',
@@ -110,8 +109,7 @@ export function SimpleLinkConverter() {
 
     // 特定格式选项的默认值
     ean128: false,
-    flat: false,
-    lastChar: ''
+    flat: false
   });
 
   // 清理定时器的 useEffect
@@ -511,19 +509,6 @@ export function SimpleLinkConverter() {
               </div>
             </div>
 
-            {/* 显示设置 */}
-            <div className="flex items-center space-x-3">
-              <Switch
-                id="displayValue"
-                checked={barcodeConfig.displayValue}
-                onCheckedChange={(checked) => setBarcodeConfig(prev => ({ ...prev, displayValue: checked as boolean }))}
-                disabled={isConverting}
-              />
-              <label htmlFor="displayValue" className="text-sm font-medium">
-                显示文本值
-              </label>
-            </div>
-
             {/* 颜色设置 */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -567,128 +552,146 @@ export function SimpleLinkConverter() {
 
               {isAdvancedOptionsOpen && (
                 <div className="space-y-4 pt-2">
-                  {/* 文本覆盖选项 */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">显示文本（覆盖原始数据）</label>
-                    <Input
-                      value={barcodeConfig.text}
-                      onChange={(e) => setBarcodeConfig(prev => ({ ...prev, text: e.target.value }))}
-                      placeholder="留空使用原始数据"
+                  {/* 显示文本值开关 */}
+                  <div className="flex items-center space-x-3 pb-2 border-b">
+                    <Switch
+                      id="displayValue"
+                      checked={barcodeConfig.displayValue ?? false}
+                      onCheckedChange={(checked) => setBarcodeConfig(prev => ({ ...prev, displayValue: checked }))}
                       disabled={isConverting}
                     />
-                    <p className="text-xs text-gray-500">留空时将使用原始字段数据作为条码文本</p>
+                    <label htmlFor="displayValue" className="text-sm font-medium">
+                      显示文本值
+                    </label>
                   </div>
 
-                  {/* 字体设置 */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">字体系列</label>
-                      <Select
-                        value={barcodeConfig.font}
-                        onValueChange={(value) => setBarcodeConfig(prev => ({ ...prev, font: value }))}
-                        disabled={isConverting}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="选择字体" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="monospace">Monospace</SelectItem>
-                          <SelectItem value="Arial">Arial</SelectItem>
-                          <SelectItem value="Helvetica">Helvetica</SelectItem>
-                          <SelectItem value="Times New Roman">Times New Roman</SelectItem>
-                          <SelectItem value="Courier New">Courier New</SelectItem>
-                          <SelectItem value="Verdana">Verdana</SelectItem>
-                          <SelectItem value="Georgia">Georgia</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">字体样式</label>
-                      <Select
-                        value={barcodeConfig.fontOptions || 'default'}
-                        onValueChange={(value) => setBarcodeConfig(prev => ({ ...prev, fontOptions: value === 'default' ? '' : value }))}
-                        disabled={isConverting}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="选择样式" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="default">默认</SelectItem>
-                          <SelectItem value="bold">粗体</SelectItem>
-                          <SelectItem value="italic">斜体</SelectItem>
-                          <SelectItem value="bold italic">粗斜体</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {/* 文本显示选项 */}
-                  <div className="space-y-4">
-                    <h4 className="text-md font-medium text-gray-800">文本显示选项</h4>
-                    
-                    <div className="grid grid-cols-2 gap-4">
+                  {/* 文本相关选项 - 仅在显示文本时显示 */}
+                  {barcodeConfig.displayValue === true && (
+                    <>
+                      {/* 文本覆盖选项 */}
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">文本位置</label>
-                        <Select
-                          value={barcodeConfig.textPosition}
-                          onValueChange={(value) => setBarcodeConfig(prev => ({ ...prev, textPosition: value as 'top' | 'bottom' }))}
+                        <label className="text-sm font-medium text-gray-700">显示文本（覆盖原始数据）</label>
+                        <Input
+                          value={barcodeConfig.text}
+                          onChange={(e) => setBarcodeConfig(prev => ({ ...prev, text: e.target.value }))}
+                          placeholder="留空使用原始数据"
                           disabled={isConverting}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="选择位置" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="top">上方</SelectItem>
-                            <SelectItem value="bottom">下方</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">文本对齐</label>
-                        <Select
-                          value={barcodeConfig.textAlign}
-                          onValueChange={(value) => setBarcodeConfig(prev => ({ ...prev, textAlign: value as 'left' | 'center' | 'right' }))}
-                          disabled={isConverting}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="选择对齐" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="left">左对齐</SelectItem>
-                            <SelectItem value="center">居中</SelectItem>
-                            <SelectItem value="right">右对齐</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">字体大小: {barcodeConfig.fontSize}px</label>
-                        <Slider
-                          value={[barcodeConfig.fontSize]}
-                          onValueChange={([value]) => setBarcodeConfig(prev => ({ ...prev, fontSize: value as number }))}
-                          max={40}
-                          min={10}
-                          step={2}
-                          disabled={isConverting}
-                          className="w-full"
                         />
+                        <p className="text-xs text-gray-500">留空时将使用原始字段数据作为条码文本</p>
                       </div>
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">文本边距: {barcodeConfig.textMargin}px</label>
-                        <Slider
-                          value={[barcodeConfig.textMargin]}
-                          onValueChange={([value]) => setBarcodeConfig(prev => ({ ...prev, textMargin: value as number }))}
-                          max={20}
-                          min={0}
-                          step={1}
-                          disabled={isConverting}
-                          className="w-full"
-                        />
+
+                      {/* 字体设置 */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-700">字体系列</label>
+                          <Select
+                            value={barcodeConfig.font}
+                            onValueChange={(value) => setBarcodeConfig(prev => ({ ...prev, font: value }))}
+                            disabled={isConverting}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="选择字体" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="monospace">Monospace</SelectItem>
+                              <SelectItem value="Arial">Arial</SelectItem>
+                              <SelectItem value="Helvetica">Helvetica</SelectItem>
+                              <SelectItem value="Times New Roman">Times New Roman</SelectItem>
+                              <SelectItem value="Courier New">Courier New</SelectItem>
+                              <SelectItem value="Verdana">Verdana</SelectItem>
+                              <SelectItem value="Georgia">Georgia</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-700">字体样式</label>
+                          <Select
+                            value={barcodeConfig.fontOptions || 'default'}
+                            onValueChange={(value) => setBarcodeConfig(prev => ({ ...prev, fontOptions: value === 'default' ? '' : value }))}
+                            disabled={isConverting}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="选择样式" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="default">默认</SelectItem>
+                              <SelectItem value="bold">粗体</SelectItem>
+                              <SelectItem value="italic">斜体</SelectItem>
+                              <SelectItem value="bold italic">粗斜体</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+
+                      {/* 文本显示选项 */}
+                      <div className="space-y-4">
+                        <h4 className="text-md font-medium text-gray-800">文本显示选项</h4>
+                        
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700">文本位置</label>
+                            <Select
+                              value={barcodeConfig.textPosition}
+                              onValueChange={(value) => setBarcodeConfig(prev => ({ ...prev, textPosition: value as 'top' | 'bottom' }))}
+                              disabled={isConverting}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="选择位置" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="top">上方</SelectItem>
+                                <SelectItem value="bottom">下方</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700">文本对齐</label>
+                            <Select
+                              value={barcodeConfig.textAlign}
+                              onValueChange={(value) => setBarcodeConfig(prev => ({ ...prev, textAlign: value as 'left' | 'center' | 'right' }))}
+                              disabled={isConverting}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="选择对齐" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="left">左对齐</SelectItem>
+                                <SelectItem value="center">居中</SelectItem>
+                                <SelectItem value="right">右对齐</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700">字体大小: {barcodeConfig.fontSize}px</label>
+                            <Slider
+                              value={[barcodeConfig.fontSize]}
+                              onValueChange={([value]) => setBarcodeConfig(prev => ({ ...prev, fontSize: value as number }))}
+                              max={40}
+                              min={10}
+                              step={2}
+                              disabled={isConverting}
+                              className="w-full"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700">文本边距: {barcodeConfig.textMargin}px</label>
+                            <Slider
+                              value={[barcodeConfig.textMargin]}
+                              onValueChange={([value]) => setBarcodeConfig(prev => ({ ...prev, textMargin: value as number }))}
+                              max={20}
+                              min={0}
+                              step={1}
+                              disabled={isConverting}
+                              className="w-full"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
 
                   {/* 边距选项 */}
                   <div className="space-y-4">
@@ -850,21 +853,6 @@ export function SimpleLinkConverter() {
                         <p className="text-xs text-gray-500">移除扩展条和分隔符，产生更紧凑的条码</p>
                       </div>
                     )}
-
-                    {/* 通用选项 */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">最后字符</label>
-                        <Input
-                          value={barcodeConfig.lastChar}
-                          onChange={(e) => setBarcodeConfig(prev => ({ ...prev, lastChar: e.target.value }))}
-                          placeholder="可选"
-                          disabled={isConverting}
-                          maxLength={1}
-                        />
-                        <p className="text-xs text-gray-500">添加到条码末尾的字符</p>
-                      </div>
-                    </div>
                   </div>
                 </div>
               )}
@@ -1005,4 +993,3 @@ export function SimpleLinkConverter() {
     </div>
   );
 }
-
