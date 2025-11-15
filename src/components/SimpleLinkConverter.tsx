@@ -40,7 +40,7 @@ import { IView } from '@/types';
 // 必填标记组件
 export const RequireCom = () => <span className="mr-0.5 text-red-500">*</span>;
 
-// 根据条码格式获取示例文本
+// 根据条形码格式获取示例文本
 const getPreviewTextByFormat = (format: BarcodeFormat): string => {
   switch (format) {
     case BarcodeFormat.CODE128:
@@ -130,7 +130,7 @@ export function SimpleLinkConverter() {
   const { tableId } = useGlobalUrlParams();
   const bridge = usePluginBridge();
 
-  // 获取支持的条码格式列表
+  // 获取支持的条形码格式列表
   const supportedFormats = BarcodeGenerator.getSupportedFormats();
 
   // Token 刷新定时器引用
@@ -145,7 +145,7 @@ export function SimpleLinkConverter() {
   const [stats, setStats] = useState({ success: 0, failed: 0, processing: 0 });
   const [isBasicConfigOpen, setIsBasicConfigOpen] = useState(true);
   const [isOptionsPreviewOpen, setIsOptionsPreviewOpen] = useState(true);
-  
+
   // 预览相关状态
   const [previewDataURL, setPreviewDataURL] = useState<string | null>(null);
   const [nextPreviewDataURL, setNextPreviewDataURL] = useState<string | null>(null);
@@ -212,10 +212,10 @@ export function SimpleLinkConverter() {
     previewTimeoutRef.current = setTimeout(async () => {
       // 生成新的请求 ID，用于确保只处理最新的请求
       const currentRequestId = ++previewRequestIdRef.current;
-      
+
       setIsGeneratingPreview(true);
       setPreviewError(null);
-      
+
       try {
         // 使用示例文本生成预览（如果用户没有自定义文本，则使用格式对应的示例文本）
         const previewText = barcodeConfig.text || getPreviewTextByFormat(barcodeConfig.format);
@@ -234,7 +234,7 @@ export function SimpleLinkConverter() {
           // 预加载图片，使用淡入淡出效果切换
           const dataURL = result.dataURL;
           const img = new Image();
-          
+
           img.onload = () => {
             // 再次检查是否是最新的请求
             if (currentRequestId !== previewRequestIdRef.current) {
@@ -245,7 +245,7 @@ export function SimpleLinkConverter() {
             // 使用 requestAnimationFrame 确保动画流畅
             requestAnimationFrame(() => {
               setIsPreviewFading(true);
-              
+
               // 等待淡出动画完成后再切换图片
               setTimeout(() => {
                 if (currentRequestId !== previewRequestIdRef.current) {
@@ -258,7 +258,7 @@ export function SimpleLinkConverter() {
               }, 300); // 与 CSS transition duration 一致
             });
           };
-          
+
           img.onerror = () => {
             // 再次检查是否是最新的请求
             if (currentRequestId !== previewRequestIdRef.current) {
@@ -266,9 +266,9 @@ export function SimpleLinkConverter() {
             }
             setIsGeneratingPreview(false);
             setIsPreviewFading(false);
-            setPreviewError('预览图片加载失败');
+            setPreviewError(t('barcode.previewFailed'));
           };
-          
+
           // 开始预加载图片
           img.src = dataURL;
         } else {
@@ -276,7 +276,7 @@ export function SimpleLinkConverter() {
           if (currentRequestId !== previewRequestIdRef.current) {
             return; // 忽略旧的请求
           }
-          setPreviewError(result.error || '预览生成失败');
+          setPreviewError(result.error || t('barcode.previewGenerationFailed'));
           setPreviewDataURL(null);
           setIsGeneratingPreview(false);
         }
@@ -285,7 +285,7 @@ export function SimpleLinkConverter() {
         if (currentRequestId !== previewRequestIdRef.current) {
           return; // 忽略旧的请求
         }
-        const errorMessage = error instanceof Error ? error.message : '预览生成失败';
+        const errorMessage = error instanceof Error ? error.message : t('barcode.previewGenerationFailed');
         setPreviewError(errorMessage);
         setPreviewDataURL(null);
         setIsGeneratingPreview(false);
@@ -342,12 +342,12 @@ export function SimpleLinkConverter() {
   );
 
   // Get selected field objects (memoized)
-  const urlField = useMemo(() => 
+  const urlField = useMemo(() =>
     fields?.find(f => f.id === selectedUrlField),
     [fields, selectedUrlField]
   );
-  
-  const attachmentField = useMemo(() => 
+
+  const attachmentField = useMemo(() =>
     fields?.find(f => f.id === selectedAttachmentField),
     [fields, selectedAttachmentField]
   );
@@ -410,16 +410,16 @@ export function SimpleLinkConverter() {
     });
   }, []);
 
-  // 生成条码并上传的转换方法
+  // 生成条形码并上传的转换方法
   const handleBarcodeConvert = async () => {
     if (!isConfigValid) {
-      toast.error(t('converter.configIncomplete'));
+      toast.error(t('barcode.configIncomplete'));
       return;
     }
 
     if (!tableId) {
-      toast.error(t('converter.tableIdUnavailable'), {
-        description: t('converter.cannotGetTableInfo')
+      toast.error(t('barcode.tableIdUnavailable'), {
+        description: t('barcode.cannotGetTableInfo')
       });
       return;
     }
@@ -468,8 +468,8 @@ export function SimpleLinkConverter() {
       const records = recordsResponse.data.records;
 
       if (!records || records.length === 0) {
-        toast.error(t('converter.noRecordsToProcess'), {
-          description: t('converter.noRecordsInView')
+        toast.error(t('barcode.noRecordsToProcess'), {
+          description: t('barcode.noRecordsInView')
         });
         setIsConverting(false);
         return;
@@ -494,10 +494,10 @@ export function SimpleLinkConverter() {
 
         totalItems += 1;
         setStats(prev => ({ ...prev, processing: prev.processing + 1 }));
-        
+
         const result: IConversionResult = {
           recordId: record.id,
-          urlCount: 1, // 对于条码，每个记录生成一个条码
+          urlCount: 1, // 对于条形码，每个记录生成一个条形码
           successCount: 0,
           failedUrls: [],
           errors: []
@@ -506,20 +506,20 @@ export function SimpleLinkConverter() {
         try {
           // 编码数据始终使用字段数据
           const encodeText = text.trim();
-          
-          // text 选项用于覆盖显示文本（条码下方的文字），不是编码数据
+
+          // text 选项用于覆盖显示文本（条形码下方的文字），不是编码数据
           // 如果用户自定义了显示文本（不等于当前格式的示例文本），则使用自定义文本；否则不设置，让 JsBarcode 默认显示编码数据
           const currentFormatText = getPreviewTextByFormat(barcodeConfig.format);
           const isUserCustomText = barcodeConfig.text && barcodeConfig.text !== currentFormatText;
-          
-          // 生成条码配置：如果用户没有自定义显示文本，则清除 text 选项
-          const configForGeneration = isUserCustomText 
-            ? barcodeConfig 
+
+          // 生成条形码配置：如果用户没有自定义显示文本，则清除 text 选项
+          const configForGeneration = isUserCustomText
+            ? barcodeConfig
             : (() => {
                 const { text, ...rest } = barcodeConfig;
                 return rest;
               })();
-          
+
           const barcodeResult: IBarcodeResult = await generateBarcode(
             encodeText,
             configForGeneration,
@@ -527,14 +527,14 @@ export function SimpleLinkConverter() {
           );
 
           if (barcodeResult.success && barcodeResult.blob) {
-            // 创建FormData来上传条码图片
+            // 创建FormData来上传条形码图片
             const formData = new FormData();
             formData.append('file', barcodeResult.blob, barcodeResult.fileName);
 
             // 构建 API URL
             const apiUrl = `/table/${tableId}/record/${record.id}/${selectedAttachmentField}/uploadAttachment`;
 
-            // 上传条码图片
+            // 上传条形码图片
             const uploadResponse = await axios.post(apiUrl, formData);
 
             if (uploadResponse.data) {
@@ -567,15 +567,15 @@ export function SimpleLinkConverter() {
       }
 
       // 显示成功消息（使用局部变量successCount而不是stats.success）
-      toast.success(t('converter.conversionCompleted'), {
-        description: t('converter.barcodesGenerated', { total: totalItems, success: successCount })
+      toast.success(t('barcode.conversionCompleted'), {
+        description: t('barcode.barcodesGenerated', { total: totalItems, success: successCount })
       });
 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('Barcode conversion error:', error);
-      toast.error(t('converter.conversionFailed'), {
-        description: `${t('converter.errorDuringConversion')}: ${errorMessage}`
+      toast.error(t('barcode.conversionFailed'), {
+        description: `${t('barcode.errorDuringConversion')}: ${errorMessage}`
       });
     } finally {
       setIsConverting(false);
@@ -589,7 +589,7 @@ export function SimpleLinkConverter() {
     }
   };
 
-  // 条码转换处理方法
+  // 条形码转换处理方法
   const handleConvert = async () => {
     return handleBarcodeConvert();
   };
@@ -598,10 +598,10 @@ export function SimpleLinkConverter() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center space-y-4">
-          <AlertCircle className="w-12 h-12 text-amber-500 mx-auto" />
+          <AlertCircle className="w-12 h-12 text-amber-500 dark:text-amber-400 mx-auto" />
           <div>
-            <h2 className="text-sm font-medium text-gray-900">{t('converter.pluginInitializing')}</h2>
-            <p className="text-[13px] text-gray-600 mt-1">{t('converter.gettingTableInfo')}</p>
+            <h2 className="text-sm font-medium text-foreground">{t('barcode.pluginInitializing')}</h2>
+            <p className="text-[13px] text-muted-foreground mt-1">{t('barcode.gettingTableInfo')}</p>
           </div>
         </div>
       </div>
@@ -613,8 +613,8 @@ export function SimpleLinkConverter() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="text-[13px] text-gray-600">{t('converter.loadingData')}</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="text-[13px] text-muted-foreground">{t('barcode.loadingData')}</p>
         </div>
       </div>
     );
@@ -622,29 +622,29 @@ export function SimpleLinkConverter() {
 
   return (
     <div className="w-full max-w-2xl mx-auto p-6 space-y-4">
-        {/* 第一部分：基础配置（条码格式、输出格式、数据源） */}
+        {/* 第一部分：基础配置（条形码格式、输出格式、数据源） */}
         <Collapsible open={isBasicConfigOpen} onOpenChange={setIsBasicConfigOpen}>
           <Card>
             <CollapsibleTrigger asChild>
-              <CardHeader className="cursor-pointer hover:bg-gray-50 transition-colors">
+              <CardHeader className="cursor-pointer hover:bg-muted transition-colors">
                 <CardTitle className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
                     <Settings className="w-5 h-5" />
-                    基础配置
+                    {t('barcode.basicSettings')}
                   </div>
                   {isBasicConfigOpen ? (
-                    <ChevronUp className="w-5 h-5 text-gray-500" />
+                    <ChevronUp className="w-5 h-5 text-muted-foreground" />
                   ) : (
-                    <ChevronDown className="w-5 h-5 text-gray-500" />
+                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
                   )}
                 </CardTitle>
               </CardHeader>
             </CollapsibleTrigger>
             <CollapsibleContent>
               <CardContent className="space-y-4">
-            {/* 条码格式 */}
+            {/* 条形码格式 */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">条码格式</label>
+              <label className="text-sm font-medium text-foreground">{t('barcode.barcodeType')}</label>
               <Select
                 value={barcodeConfig.format}
                 onValueChange={(value) => {
@@ -661,7 +661,7 @@ export function SimpleLinkConverter() {
                 disabled={isConverting}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="选择条码格式" />
+                  <SelectValue placeholder={t('barcode.selectBarcodeType')} />
                 </SelectTrigger>
                 <SelectContent>
                   {supportedFormats.map((format) => (
@@ -675,14 +675,14 @@ export function SimpleLinkConverter() {
 
             {/* 输出格式 */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-700">输出格式</label>
+              <label className="text-sm font-medium text-foreground">{t('barcode.fileFormat')}</label>
               <Select
                 value={barcodeConfig.outputFormat}
                 onValueChange={(value) => setBarcodeConfig(prev => ({ ...prev, outputFormat: value as OutputFormat }))}
                 disabled={isConverting}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="选择输出格式" />
+                  <SelectValue placeholder={t('barcode.selectFileFormat')} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={OutputFormat.PNG}>PNG</SelectItem>
@@ -692,20 +692,20 @@ export function SimpleLinkConverter() {
             </div>
 
                 {/* 数据源 */}
-                <div className="space-y-4 pt-4 border-t">
+                <div className="space-y-4">
                   {/* 选择视图 */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">
+                    <label className="text-sm font-medium text-foreground">
                       <RequireCom />
-                      {t('converter.selectView')}
+                      {t('barcode.selectView')}
                     </label>
                     <Select value={selectedViewId} onValueChange={setSelectedViewId} disabled={isConverting}>
                       <SelectTrigger>
-                        <SelectValue placeholder={t('converter.selectViewPlaceholder')} />
+                        <SelectValue placeholder={t('barcode.selectViewPlaceholder')} />
                       </SelectTrigger>
                       <SelectContent>
                         {viewsArray.length === 0 ? (
-                          <SelectItem value="no-views" disabled>{t('converter.noViewsFound')}</SelectItem>
+                          <SelectItem value="no-views" disabled>{t('barcode.noViewsFound')}</SelectItem>
                         ) : (
                           viewsArray.map((view) => (
                             <SelectItem key={view.id} value={view.id}>
@@ -722,18 +722,18 @@ export function SimpleLinkConverter() {
 
                   {/* 选择源字段 */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">
+                    <label className="text-sm font-medium text-foreground">
                       <RequireCom />
-                      选择数据字段
+                      {t('barcode.dataSourceField')}
                     </label>
                     <Select value={selectedUrlField} onValueChange={setSelectedUrlField} disabled={isConverting}>
                       <SelectTrigger>
-                        <SelectValue placeholder={t('converter.selectFieldPlaceholder')} />
+                        <SelectValue placeholder={t('barcode.selectFieldPlaceholder')} />
                       </SelectTrigger>
                       <SelectContent>
                         {sourceFields.length === 0 ? (
                           <SelectItem value="no-fields" disabled>
-                            未找到文本或数字字段
+                            {t('barcode.noDataFieldsFound')}
                           </SelectItem>
                         ) : (
                           sourceFields.map((field) => (
@@ -741,9 +741,6 @@ export function SimpleLinkConverter() {
                               <div className="flex items-center gap-2">
                                 {getFieldIcon(field.type, field.cellValueType)}
                                 <span>{field.name}</span>
-                                <span className="text-[13px] text-gray-500 ml-1">
-                                  {field.cellValueType === 'number' ? '(数字)' : '(文本)'}
-                                </span>
                               </div>
                             </SelectItem>
                           ))
@@ -754,17 +751,17 @@ export function SimpleLinkConverter() {
 
                   {/* 选择附件字段 */}
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">
+                    <label className="text-sm font-medium text-foreground">
                       <RequireCom />
-                      {t('converter.selectAttachmentField')}
+                      {t('barcode.selectAttachmentField')}
                     </label>
                     <Select value={selectedAttachmentField} onValueChange={setSelectedAttachmentField} disabled={isConverting}>
                       <SelectTrigger>
-                        <SelectValue placeholder={t('converter.selectFieldPlaceholder')} />
+                        <SelectValue placeholder={t('barcode.selectFieldPlaceholder')} />
                       </SelectTrigger>
                       <SelectContent>
                         {attachmentFields.length === 0 ? (
-                          <SelectItem value="no-fields" disabled>{t('converter.noAttachmentFieldsFound')}</SelectItem>
+                          <SelectItem value="no-fields" disabled>{t('barcode.noAttachmentFieldsFound')}</SelectItem>
                         ) : (
                           attachmentFields.map((field) => (
                             <SelectItem key={field.id} value={field.id}>
@@ -778,66 +775,26 @@ export function SimpleLinkConverter() {
                       </SelectContent>
                     </Select>
                   </div>
-
-                  {/* 转换进度 */}
-                  {(isConverting || stats.success > 0 || stats.failed > 0) && (
-                    <div className="space-y-3 p-4 border rounded-lg bg-gray-50">
-                      <div className="text-sm font-medium text-gray-700 flex items-center gap-1">
-                        条码生成进度
-                      </div>
-                      {isConverting && (
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-[13px] text-gray-600 mb-1">
-                            <span>{t('converter.progress')}</span>
-                            <span>{Math.round(progress)}%</span>
-                          </div>
-                          <Progress value={progress} className="h-2" />
-                        </div>
-                      )}
-                      <div className="flex gap-6 text-[13px]">
-                        <span className="text-green-600">{t('converter.successful')}: {stats.success}{t('converter.countUnit')}</span>
-                        {stats.failed > 0 && <span className="text-red-600">{t('converter.failed')}: {stats.failed}{t('converter.countUnit')}</span>}
-                        {stats.processing > 0 && <span className="text-blue-600">{t('converter.processing')}: {stats.processing}{t('converter.countUnit')}</span>}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* 开始转换按钮 */}
-                  <Button
-                    onClick={handleConvert}
-                    disabled={!isConfigValid || isConverting}
-                    className="w-full"
-                    size="lg"
-                  >
-                    {isConverting ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        生成条码中...
-                      </>
-                    ) : (
-                      '开始生成条码'
-                    )}
-                  </Button>
                 </div>
               </CardContent>
             </CollapsibleContent>
           </Card>
         </Collapsible>
 
-        {/* 第二部分：条码选项+预览 */}
+        {/* 第二部分：条形码选项+预览 */}
         <Collapsible open={isOptionsPreviewOpen} onOpenChange={setIsOptionsPreviewOpen}>
           <Card>
             <CollapsibleTrigger asChild>
-              <CardHeader className="cursor-pointer hover:bg-gray-50 transition-colors">
+              <CardHeader className="cursor-pointer hover:bg-muted transition-colors">
                 <CardTitle className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
                     <Settings className="w-5 h-5" />
-                    条码选项与预览
+                    {t('barcode.appearancePreview')}
                   </div>
                   {isOptionsPreviewOpen ? (
-                    <ChevronUp className="w-5 h-5 text-gray-500" />
+                    <ChevronUp className="w-5 h-5 text-muted-foreground" />
                   ) : (
-                    <ChevronDown className="w-5 h-5 text-gray-500" />
+                    <ChevronDown className="w-5 h-5 text-muted-foreground" />
                   )}
                 </CardTitle>
               </CardHeader>
@@ -847,7 +804,7 @@ export function SimpleLinkConverter() {
                 {/* 尺寸设置 */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">宽度: {barcodeConfig.width}px</label>
+                    <label className="text-sm font-medium text-foreground">{t('barcode.width')}: {barcodeConfig.width}px</label>
                     <Slider
                       value={[barcodeConfig.width]}
                       onValueChange={([value]) => setBarcodeConfig(prev => ({ ...prev, width: value as number }))}
@@ -859,7 +816,7 @@ export function SimpleLinkConverter() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">高度: {barcodeConfig.height}px</label>
+                    <label className="text-sm font-medium text-foreground">{t('barcode.height')}: {barcodeConfig.height}px</label>
                     <Slider
                       value={[barcodeConfig.height]}
                       onValueChange={([value]) => setBarcodeConfig(prev => ({ ...prev, height: value as number }))}
@@ -874,31 +831,36 @@ export function SimpleLinkConverter() {
 
                 {/* 颜色设置 */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">条码颜色</label>
+                  <div className="flex items-center gap-2">
                     <input
                       type="color"
                       value={barcodeConfig.lineColor}
                       onChange={(e) => setBarcodeConfig(prev => ({ ...prev, lineColor: e.target.value }))}
                       disabled={isConverting}
-                      className="w-full h-10 rounded border"
+                      className="w-7 h-7 rounded border-border cursor-pointer"
                     />
+                    <label className="text-sm font-medium text-foreground">{t('barcode.barcodeColor')}</label>
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">背景颜色</label>
+                  <div className="flex items-center gap-2">
                     <input
                       type="color"
                       value={barcodeConfig.background}
                       onChange={(e) => setBarcodeConfig(prev => ({ ...prev, background: e.target.value }))}
                       disabled={isConverting}
-                      className="w-full h-10 rounded border"
+                      className="w-7 h-7 rounded border-border cursor-pointer"
                     />
+                    <label className="text-sm font-medium text-foreground">{t('barcode.backgroundColor')}</label>
                   </div>
                 </div>
 
                 <Separator />
+
+                {/* 文字设置 */}
+                <div className="space-y-4">
+                  <h4 className="text-base font-medium text-foreground">{t('barcode.textSettings')}</h4>
+
                   {/* 显示文本值开关 */}
-                  <div className="flex items-center space-x-3 pb-2 border-b">
+                  <div className="flex items-center space-x-3 pb-2">
                     <Switch
                       id="displayValue"
                       checked={barcodeConfig.displayValue ?? false}
@@ -906,7 +868,7 @@ export function SimpleLinkConverter() {
                       disabled={isConverting}
                     />
                     <label htmlFor="displayValue" className="text-sm font-medium">
-                      显示文本值
+                      {t('barcode.displayText')}
                     </label>
                   </div>
 
@@ -915,11 +877,11 @@ export function SimpleLinkConverter() {
                     <>
                       {/* 文本覆盖选项 */}
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">显示文本</label>
+                        <label className="text-sm font-medium text-foreground">{t('barcode.displayTextLabel')}</label>
                         <Input
                           value={barcodeConfig.text}
                           onChange={(e) => setBarcodeConfig(prev => ({ ...prev, text: e.target.value }))}
-                          placeholder="留空使用原始数据"
+                          placeholder={t('barcode.leaveEmptyForBarcodeData')}
                           disabled={isConverting}
                         />
                       </div>
@@ -927,14 +889,14 @@ export function SimpleLinkConverter() {
                       {/* 字体设置 */}
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <label className="text-sm font-medium text-gray-700">字体系列</label>
+                          <label className="text-sm font-medium text-foreground">{t('barcode.font')}</label>
                           <Select
                             value={barcodeConfig.font}
                             onValueChange={(value) => setBarcodeConfig(prev => ({ ...prev, font: value }))}
                             disabled={isConverting}
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="选择字体" />
+                              <SelectValue placeholder={t('barcode.selectFont')} />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="monospace">Monospace</SelectItem>
@@ -948,20 +910,20 @@ export function SimpleLinkConverter() {
                           </Select>
                         </div>
                         <div className="space-y-2">
-                          <label className="text-sm font-medium text-gray-700">字体样式</label>
+                          <label className="text-sm font-medium text-foreground">{t('barcode.fontStyle')}</label>
                           <Select
                             value={barcodeConfig.fontOptions || 'default'}
                             onValueChange={(value) => setBarcodeConfig(prev => ({ ...prev, fontOptions: value === 'default' ? '' : value }))}
                             disabled={isConverting}
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="选择样式" />
+                              <SelectValue placeholder={t('barcode.selectStyle')} />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="default">默认</SelectItem>
-                              <SelectItem value="bold">粗体</SelectItem>
-                              <SelectItem value="italic">斜体</SelectItem>
-                              <SelectItem value="bold italic">粗斜体</SelectItem>
+                              <SelectItem value="default">{t('barcode.default')}</SelectItem>
+                              <SelectItem value="bold">{t('barcode.bold')}</SelectItem>
+                              <SelectItem value="italic">{t('barcode.italic')}</SelectItem>
+                              <SelectItem value="bold italic">{t('barcode.boldItalic')}</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -969,39 +931,37 @@ export function SimpleLinkConverter() {
 
                       {/* 文本显示选项 */}
                       <div className="space-y-4">
-                        <h4 className="text-sm font-medium text-gray-800">文本显示选项</h4>
-                        
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700">文本位置</label>
+                            <label className="text-sm font-medium text-foreground">{t('barcode.textPosition')}</label>
                             <Select
                               value={barcodeConfig.textPosition}
                               onValueChange={(value) => setBarcodeConfig(prev => ({ ...prev, textPosition: value as 'top' | 'bottom' }))}
                               disabled={isConverting}
                             >
                               <SelectTrigger>
-                                <SelectValue placeholder="选择位置" />
+                                <SelectValue placeholder={t('barcode.selectPosition')} />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="top">上方</SelectItem>
-                                <SelectItem value="bottom">下方</SelectItem>
+                                <SelectItem value="top">{t('barcode.top')}</SelectItem>
+                                <SelectItem value="bottom">{t('barcode.bottom')}</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
                           <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700">文本对齐</label>
+                            <label className="text-sm font-medium text-foreground">{t('barcode.textAlignment')}</label>
                             <Select
                               value={barcodeConfig.textAlign}
                               onValueChange={(value) => setBarcodeConfig(prev => ({ ...prev, textAlign: value as 'left' | 'center' | 'right' }))}
                               disabled={isConverting}
                             >
                               <SelectTrigger>
-                                <SelectValue placeholder="选择对齐" />
+                                <SelectValue placeholder={t('barcode.selectAlignment')} />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="left">左对齐</SelectItem>
-                                <SelectItem value="center">居中</SelectItem>
-                                <SelectItem value="right">右对齐</SelectItem>
+                                <SelectItem value="left">{t('barcode.leftAlign')}</SelectItem>
+                                <SelectItem value="center">{t('barcode.center')}</SelectItem>
+                                <SelectItem value="right">{t('barcode.rightAlign')}</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -1009,7 +969,7 @@ export function SimpleLinkConverter() {
 
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700">字体大小: {barcodeConfig.fontSize}px</label>
+                            <label className="text-sm font-medium text-foreground">{t('barcode.fontSize')}: {barcodeConfig.fontSize}px</label>
                             <Slider
                               value={[barcodeConfig.fontSize]}
                               onValueChange={([value]) => setBarcodeConfig(prev => ({ ...prev, fontSize: value as number }))}
@@ -1021,7 +981,7 @@ export function SimpleLinkConverter() {
                             />
                           </div>
                           <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700">文本边距: {barcodeConfig.textMargin}px</label>
+                            <label className="text-sm font-medium text-foreground">{t('barcode.textMargin')}: {barcodeConfig.textMargin}px</label>
                             <Slider
                               value={[barcodeConfig.textMargin]}
                               onValueChange={([value]) => setBarcodeConfig(prev => ({ ...prev, textMargin: value as number }))}
@@ -1036,13 +996,16 @@ export function SimpleLinkConverter() {
                       </div>
                     </>
                   )}
+                </div>
 
-                  {/* 边距选项 */}
+                  <Separator />
+
+                {/* 边距选项 */}
                   <div className="space-y-4">
-                    <h4 className="text-sm font-medium text-gray-800">边距选项</h4>
-                    
+                    <h4 className="text-base font-medium text-foreground">{t('barcode.marginSettings')}</h4>
+
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">统一边距: {barcodeConfig.margin}px</label>
+                      <label className="text-sm font-medium text-foreground">{t('barcode.margin')}: {barcodeConfig.margin}px</label>
                       <Slider
                         value={[barcodeConfig.margin]}
                         onValueChange={([value]) => {
@@ -1065,8 +1028,8 @@ export function SimpleLinkConverter() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">
-                          上边距: {barcodeConfig.marginTop ?? barcodeConfig.margin}px
+                        <label className="text-sm font-medium text-foreground">
+                          {t('barcode.topMargin')}: {barcodeConfig.marginTop ?? barcodeConfig.margin}px
                         </label>
                         <Slider
                           value={[barcodeConfig.marginTop ?? barcodeConfig.margin]}
@@ -1088,8 +1051,8 @@ export function SimpleLinkConverter() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">
-                          下边距: {barcodeConfig.marginBottom ?? barcodeConfig.margin}px
+                        <label className="text-sm font-medium text-foreground">
+                          {t('barcode.bottomMargin')}: {barcodeConfig.marginBottom ?? barcodeConfig.margin}px
                         </label>
                         <Slider
                           value={[barcodeConfig.marginBottom ?? barcodeConfig.margin]}
@@ -1114,8 +1077,8 @@ export function SimpleLinkConverter() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">
-                          左边距: {barcodeConfig.marginLeft ?? barcodeConfig.margin}px
+                        <label className="text-sm font-medium text-foreground">
+                          {t('barcode.leftMargin')}: {barcodeConfig.marginLeft ?? barcodeConfig.margin}px
                         </label>
                         <Slider
                           value={[barcodeConfig.marginLeft ?? barcodeConfig.margin]}
@@ -1137,8 +1100,8 @@ export function SimpleLinkConverter() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">
-                          右边距: {barcodeConfig.marginRight ?? barcodeConfig.margin}px
+                        <label className="text-sm font-medium text-foreground">
+                          {t('barcode.rightMargin')}: {barcodeConfig.marginRight ?? barcodeConfig.margin}px
                         </label>
                         <Slider
                           value={[barcodeConfig.marginRight ?? barcodeConfig.margin]}
@@ -1162,8 +1125,137 @@ export function SimpleLinkConverter() {
                     </div>
                   </div>
 
-                  {/* 格式特定选项 - 仅在相关格式时显示 */}
-                  {((barcodeConfig.format === 'CODE128' ||
+                <Separator />
+
+                {/* 边距选项 */}
+                <div className="space-y-4">
+                  <h4 className="text-base font-medium text-foreground">{t('barcode.marginSettings')}</h4>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">{t('barcode.margin')}: {barcodeConfig.margin}px</label>
+                    <Slider
+                      value={[barcodeConfig.margin]}
+                      onValueChange={([value]) => {
+                        setBarcodeConfig(prev => {
+                          // 调整统一边距时，清除所有单独边距设置，让它们使用统一边距
+                          const { marginTop, marginBottom, marginLeft, marginRight, ...rest } = prev;
+                          return {
+                            ...rest,
+                            margin: value as number,
+                          };
+                        });
+                      }}
+                      max={50}
+                      min={0}
+                      step={1}
+                      disabled={isConverting}
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        {t('barcode.topMargin')}: {barcodeConfig.marginTop ?? barcodeConfig.margin}px
+                      </label>
+                      <Slider
+                        value={[barcodeConfig.marginTop ?? barcodeConfig.margin]}
+                        onValueChange={([value]) => {
+                          if (value === barcodeConfig.margin) {
+                            setBarcodeConfig(prev => {
+                              const { marginTop, ...rest } = prev;
+                              return rest;
+                            });
+                          } else {
+                            setBarcodeConfig(prev => ({ ...prev, marginTop: value as number }));
+                          }
+                        }}
+                        max={50}
+                        min={0}
+                        step={1}
+                        disabled={isConverting}
+                        className="w-full"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        {t('barcode.bottomMargin')}: {barcodeConfig.marginBottom ?? barcodeConfig.margin}px
+                      </label>
+                      <Slider
+                        value={[barcodeConfig.marginBottom ?? barcodeConfig.margin]}
+                        onValueChange={([value]) => {
+                          if (value === barcodeConfig.margin) {
+                            setBarcodeConfig(prev => {
+                              const { marginBottom, ...rest } = prev;
+                              return rest;
+                            });
+                          } else {
+                            setBarcodeConfig(prev => ({ ...prev, marginBottom: value as number }));
+                          }
+                        }}
+                        max={50}
+                        min={0}
+                        step={1}
+                        disabled={isConverting}
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        {t('barcode.leftMargin')}: {barcodeConfig.marginLeft ?? barcodeConfig.margin}px
+                      </label>
+                      <Slider
+                        value={[barcodeConfig.marginLeft ?? barcodeConfig.margin]}
+                        onValueChange={([value]) => {
+                          if (value === barcodeConfig.margin) {
+                            setBarcodeConfig(prev => {
+                              const { marginLeft, ...rest } = prev;
+                              return rest;
+                            });
+                          } else {
+                            setBarcodeConfig(prev => ({ ...prev, marginLeft: value as number }));
+                          }
+                        }}
+                        max={50}
+                        min={0}
+                        step={1}
+                        disabled={isConverting}
+                        className="w-full"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        {t('barcode.rightMargin')}: {barcodeConfig.marginRight ?? barcodeConfig.margin}px
+                      </label>
+                      <Slider
+                        value={[barcodeConfig.marginRight ?? barcodeConfig.margin]}
+                        onValueChange={([value]) => {
+                          if (value === barcodeConfig.margin) {
+                            setBarcodeConfig(prev => {
+                              const { marginRight, ...rest } = prev;
+                              return rest;
+                            });
+                          } else {
+                            setBarcodeConfig(prev => ({ ...prev, marginRight: value as number }));
+                          }
+                        }}
+                        max={50}
+                        min={0}
+                        step={1}
+                        disabled={isConverting}
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* 格式特定选项 - 仅在相关格式时显示 */}
+                {((barcodeConfig.format === 'CODE128' ||
                       barcodeConfig.format === 'CODE128A' ||
                       barcodeConfig.format === 'CODE128B' ||
                       barcodeConfig.format === 'CODE128C') ||
@@ -1173,73 +1265,114 @@ export function SimpleLinkConverter() {
                       barcodeConfig.format === 'EAN2' ||
                       barcodeConfig.format === 'UPC' ||
                       barcodeConfig.format === 'UPCE')) && (
-                    <div className="space-y-4">
-                      <h4 className="text-sm font-medium text-gray-800">格式特定选项</h4>
+                  <div className="space-y-4">
+                    <h4 className="text-base font-medium text-foreground">{t('barcode.formatSpecific')}</h4>
 
-                      {/* CODE128系列选项 */}
-                      {(barcodeConfig.format === 'CODE128' ||
-                        barcodeConfig.format === 'CODE128A' ||
-                        barcodeConfig.format === 'CODE128B' ||
-                        barcodeConfig.format === 'CODE128C') && (
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-gray-700">GS1-128编码</label>
-                          <div className="flex items-center space-x-2">
-                            <Switch
-                              checked={typeof barcodeConfig.ean128 === 'boolean' ? barcodeConfig.ean128 : barcodeConfig.ean128 === 'true'}
-                              onCheckedChange={(checked) => setBarcodeConfig(prev => ({ ...prev, ean128: checked }))}
-                              disabled={isConverting}
-                            />
-                            <span className="text-[13px] text-gray-600">启用</span>
-                          </div>
+                    {/* CODE128系列选项 */}
+                    {(barcodeConfig.format === 'CODE128' ||
+                      barcodeConfig.format === 'CODE128A' ||
+                      barcodeConfig.format === 'CODE128B' ||
+                      barcodeConfig.format === 'CODE128C') && (
+                      <div className="space-y-4">
+                        <div className="flex items-center space-x-3">
+                          <Switch
+                            checked={typeof barcodeConfig.ean128 === 'boolean' ? barcodeConfig.ean128 : barcodeConfig.ean128 === 'true'}
+                            onCheckedChange={(checked) => setBarcodeConfig(prev => ({ ...prev, ean128: checked }))}
+                            disabled={isConverting}
+                          />
+                          <span className="text-sm font-medium text-foreground">{t('barcode.gs1128')}</span>
                         </div>
-                      )}
+                      </div>
+                    )}
 
-                      {/* EAN/UPC系列选项 */}
-                      {(barcodeConfig.format === 'EAN13' ||
-                        barcodeConfig.format === 'EAN8' ||
-                        barcodeConfig.format === 'EAN5' ||
-                        barcodeConfig.format === 'EAN2' ||
-                        barcodeConfig.format === 'UPC' ||
-                        barcodeConfig.format === 'UPCE') && (
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium text-gray-700">扁平化编码</label>
-                          <div className="flex items-center space-x-2">
-                            <Switch
-                              checked={barcodeConfig.flat}
-                              onCheckedChange={(checked) => setBarcodeConfig(prev => ({ ...prev, flat: checked }))}
-                              disabled={isConverting}
-                            />
-                            <span className="text-[13px] text-gray-600">启用</span>
-                          </div>
+                    {/* EAN/UPC系列选项 */}
+                    {(barcodeConfig.format === 'EAN13' ||
+                      barcodeConfig.format === 'EAN8' ||
+                      barcodeConfig.format === 'EAN5' ||
+                      barcodeConfig.format === 'EAN2' ||
+                      barcodeConfig.format === 'UPC' ||
+                      barcodeConfig.format === 'UPCE') && (
+                      <div className="space-y-4">
+                        <div className="flex items-center space-x-3">
+                          <Switch
+                            checked={barcodeConfig.flat}
+                            onCheckedChange={(checked) => setBarcodeConfig(prev => ({ ...prev, flat: checked }))}
+                            disabled={isConverting}
+                          />
+                          <span className="text-sm font-medium text-foreground">{t('barcode.compactFormat')}</span>
                         </div>
-                      )}
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* 预览 */}
                 <Separator />
                 <div className="space-y-3">
-                  <h4 className="text-sm font-medium text-gray-800">预览</h4>
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-medium text-foreground">{t('barcode.preview')}</h4>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setBarcodeConfig(prev => {
+                          const { marginTop, marginBottom, marginLeft, marginRight, format, ...rest } = prev;
+                          const isCODE128 = format === 'CODE128' || format === 'CODE128A' || format === 'CODE128B' || format === 'CODE128C';
+                          const isEAN_UPC = format === 'EAN13' || format === 'EAN8' || format === 'EAN5' || format === 'EAN2' || format === 'UPC' || format === 'UPCE';
+                          
+                          return {
+                            ...rest,
+                            format,
+                            // 重置宽度和高度
+                            width: 2,
+                            height: 100,
+                            // 重置颜色
+                            lineColor: '#000000',
+                            background: '#FFFFFF',
+                            // 重置边距
+                            margin: 10,
+                            // 重置文字设置
+                            displayValue: false,
+                            text: '',
+                            font: 'monospace',
+                            fontOptions: '',
+                            textAlign: 'center',
+                            textPosition: 'bottom',
+                            textMargin: 2,
+                            fontSize: 20,
+                            // 根据格式重置GS1-128或紧凑格式
+                            ...(isCODE128 ? { ean128: false } : {}),
+                            ...(isEAN_UPC ? { flat: false } : {}),
+                          };
+                        });
+                      }}
+                      disabled={isConverting}
+                      className="h-7 text-xs text-muted-foreground hover:text-foreground bg-muted/80 hover:bg-muted/60"
+                    >
+                      {t('barcode.resetAllSettings')}
+                    </Button>
+                  </div>
                   {isGeneratingPreview ? (
                     <div className="flex flex-col items-center justify-center py-8 space-y-2">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                      <p className="text-[13px] text-gray-600">正在生成预览...</p>
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      <p className="text-[13px] text-muted-foreground">{t('barcode.previewing')}</p>
                     </div>
                   ) : previewError ? (
                     <div className="flex flex-col items-center justify-center py-8 space-y-2">
-                      <AlertCircle className="w-8 h-8 text-red-500" />
-                      <p className="text-[13px] text-red-600">{previewError}</p>
-                      <p className="text-[13px] text-gray-500">预览文本: {barcodeConfig.text || getPreviewTextByFormat(barcodeConfig.format)}</p>
+                      <AlertCircle className="w-8 h-8 text-destructive" />
+                      <p className="text-[13px] text-destructive">{previewError}</p>
+                      <p className="text-[13px] text-muted-foreground">{t('barcode.previewText')}: {barcodeConfig.text || getPreviewTextByFormat(barcodeConfig.format)}</p>
                     </div>
                   ) : previewDataURL ? (
                     <div className="flex flex-col items-center space-y-3">
-                      <div className="relative p-4 bg-white border rounded-lg flex items-center justify-center min-h-[100px] overflow-hidden">
+                      <div className="relative p-4 bg-background border rounded-lg flex items-center justify-center min-h-[100px] overflow-hidden">
                         {/* 当前显示的图片 */}
                         {previewDataURL && (
-                          <img 
+                          <img
                             ref={previewImageRef}
-                            src={previewDataURL} 
-                            alt="条码预览" 
+                            src={previewDataURL}
+                            alt={t('barcode.barcodePreview')}
                             className={`max-w-full h-auto transition-opacity duration-300 ease-in-out ${
                               isPreviewFading ? 'opacity-0' : 'opacity-100'
                             }`}
@@ -1248,9 +1381,9 @@ export function SimpleLinkConverter() {
                         )}
                         {/* 下一张预加载的图片 */}
                         {nextPreviewDataURL && (
-                          <img 
-                            src={nextPreviewDataURL} 
-                            alt="条码预览" 
+                          <img
+                            src={nextPreviewDataURL}
+                            alt={t('barcode.barcodePreview')}
                             className={`absolute inset-0 p-4 max-w-full h-auto transition-opacity duration-300 ease-in-out ${
                               isPreviewFading ? 'opacity-100' : 'opacity-0'
                             }`}
@@ -1259,18 +1392,18 @@ export function SimpleLinkConverter() {
                         )}
                         {/* 加载指示器 */}
                         {isGeneratingPreview && !nextPreviewDataURL && (
-                          <div className="absolute inset-0 flex items-center justify-center z-10 bg-white bg-opacity-50 backdrop-blur-sm">
-                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                          <div className="absolute inset-0 flex items-center justify-center z-10 bg-background bg-opacity-50 backdrop-blur-sm">
+                            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                           </div>
                         )}
                       </div>
-                      <p className="text-[13px] text-gray-500">
-                        预览文本: <span className="font-mono">{barcodeConfig.text || getPreviewTextByFormat(barcodeConfig.format)}</span>
+                      <p className="text-[13px] text-muted-foreground">
+                        {t('barcode.previewText')}: <span className="font-mono">{barcodeConfig.text || getPreviewTextByFormat(barcodeConfig.format)}</span>
                       </p>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center py-8">
-                      <p className="text-[13px] text-gray-500">配置条码参数以查看预览</p>
+                      <p className="text-[13px] text-muted-foreground">{t('barcode.adjustSettingsToSeePreview')}</p>
                     </div>
                   )}
                 </div>
@@ -1278,6 +1411,50 @@ export function SimpleLinkConverter() {
             </CollapsibleContent>
           </Card>
         </Collapsible>
-      </div>
-    );
+
+        {/* 第三部分：转换进度和生成按钮 */}
+        {(isConverting || stats.success > 0 || stats.failed > 0) && (
+          <Card>
+            <CardContent className="space-y-4">
+              <div className="space-y-3 p-4 border rounded-lg bg-muted">
+                <div className="text-sm font-medium text-foreground flex items-center gap-1">
+                  {t('barcode.generationProgress')}
+                </div>
+                {isConverting && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-[13px] text-muted-foreground mb-1">
+                      <span>{t('barcode.progress')}</span>
+                      <span>{Math.round(progress)}%</span>
+                    </div>
+                    <Progress value={progress} className="h-2" />
+                  </div>
+                )}
+                <div className="flex gap-6 text-[13px]">
+                  <span className="text-green-600 dark:text-green-400">{t('barcode.successful')}: {stats.success}{t('barcode.countUnit')}</span>
+                  {stats.failed > 0 && <span className="text-red-600 dark:text-red-400">{t('barcode.failed')}: {stats.failed}{t('barcode.countUnit')}</span>}
+                  {stats.processing > 0 && <span className="text-blue-600 dark:text-blue-400">{t('barcode.processing')}: {stats.processing}{t('barcode.countUnit')}</span>}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* 开始生成条形码按钮 */}
+        <Button
+          onClick={handleConvert}
+          disabled={!isConfigValid || isConverting}
+          className="w-full"
+          size="lg"
+        >
+          {isConverting ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground mr-2"></div>
+              {t('barcode.generating')}
+            </>
+          ) : (
+            t('barcode.generateBarcode')
+          )}
+        </Button>
+    </div>
+  );
 }
