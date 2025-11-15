@@ -37,7 +37,7 @@ import { useGlobalUrlParams } from '@/hooks/useGlobalUrlParams';
 import { IView } from '@/types';
 
 // 必填标记组件
-export const RequireCom = () => <span className="ml-0.5 text-red-500">*</span>;
+export const RequireCom = () => <span className="mr-0.5 text-red-500">*</span>;
 
 interface BarcodeConfig {
   format: BarcodeFormat;
@@ -49,11 +49,20 @@ interface BarcodeConfig {
   lineColor: string;
   background: string;
   margin: number;
+  marginTop?: number;
+  marginBottom?: number;
+  marginLeft?: number;
+  marginRight?: number;
 
-  // 新增的JsBarcode选项
+  // 文本显示选项
   text: string;
   font: string;
   fontOptions: string;
+  textAlign: 'left' | 'center' | 'right';
+  textPosition: 'top' | 'bottom';
+  textMargin: number;
+
+  // 特定格式选项
   ean128: boolean | string;
   flat: boolean;
   lastChar: string;
@@ -91,10 +100,15 @@ export function SimpleLinkConverter() {
     background: '#FFFFFF',
     margin: 10,
 
-    // 新增选项的默认值
+    // 文本显示选项的默认值
     text: '',
     font: 'monospace',
     fontOptions: '',
+    textAlign: 'center',
+    textPosition: 'bottom',
+    textMargin: 2,
+
+    // 特定格式选项的默认值
     ean128: false,
     flat: false,
     lastChar: ''
@@ -608,6 +622,191 @@ export function SimpleLinkConverter() {
                     </div>
                   </div>
 
+                  {/* 文本显示选项 */}
+                  <div className="space-y-4">
+                    <h4 className="text-md font-medium text-gray-800">文本显示选项</h4>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">文本位置</label>
+                        <Select
+                          value={barcodeConfig.textPosition}
+                          onValueChange={(value) => setBarcodeConfig(prev => ({ ...prev, textPosition: value as 'top' | 'bottom' }))}
+                          disabled={isConverting}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="选择位置" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="top">上方</SelectItem>
+                            <SelectItem value="bottom">下方</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">文本对齐</label>
+                        <Select
+                          value={barcodeConfig.textAlign}
+                          onValueChange={(value) => setBarcodeConfig(prev => ({ ...prev, textAlign: value as 'left' | 'center' | 'right' }))}
+                          disabled={isConverting}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="选择对齐" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="left">左对齐</SelectItem>
+                            <SelectItem value="center">居中</SelectItem>
+                            <SelectItem value="right">右对齐</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">字体大小: {barcodeConfig.fontSize}px</label>
+                        <Slider
+                          value={[barcodeConfig.fontSize]}
+                          onValueChange={([value]) => setBarcodeConfig(prev => ({ ...prev, fontSize: value as number }))}
+                          max={40}
+                          min={10}
+                          step={2}
+                          disabled={isConverting}
+                          className="w-full"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">文本边距: {barcodeConfig.textMargin}px</label>
+                        <Slider
+                          value={[barcodeConfig.textMargin]}
+                          onValueChange={([value]) => setBarcodeConfig(prev => ({ ...prev, textMargin: value as number }))}
+                          max={20}
+                          min={0}
+                          step={1}
+                          disabled={isConverting}
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 边距选项 */}
+                  <div className="space-y-4">
+                    <h4 className="text-md font-medium text-gray-800">边距选项</h4>
+                    
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">统一边距: {barcodeConfig.margin}px</label>
+                      <Slider
+                        value={[barcodeConfig.margin]}
+                        onValueChange={([value]) => setBarcodeConfig(prev => ({ ...prev, margin: value as number }))}
+                        max={50}
+                        min={0}
+                        step={1}
+                        disabled={isConverting}
+                        className="w-full"
+                      />
+                      <p className="text-xs text-gray-500">设置统一的边距，可被各方向边距覆盖</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">
+                          上边距: {barcodeConfig.marginTop ?? barcodeConfig.margin}px
+                        </label>
+                        <Slider
+                          value={[barcodeConfig.marginTop ?? barcodeConfig.margin]}
+                          onValueChange={([value]) => {
+                            if (value === barcodeConfig.margin) {
+                              setBarcodeConfig(prev => {
+                                const { marginTop, ...rest } = prev;
+                                return rest;
+                              });
+                            } else {
+                              setBarcodeConfig(prev => ({ ...prev, marginTop: value as number }));
+                            }
+                          }}
+                          max={50}
+                          min={0}
+                          step={1}
+                          disabled={isConverting}
+                          className="w-full"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">
+                          下边距: {barcodeConfig.marginBottom ?? barcodeConfig.margin}px
+                        </label>
+                        <Slider
+                          value={[barcodeConfig.marginBottom ?? barcodeConfig.margin]}
+                          onValueChange={([value]) => {
+                            if (value === barcodeConfig.margin) {
+                              setBarcodeConfig(prev => {
+                                const { marginBottom, ...rest } = prev;
+                                return rest;
+                              });
+                            } else {
+                              setBarcodeConfig(prev => ({ ...prev, marginBottom: value as number }));
+                            }
+                          }}
+                          max={50}
+                          min={0}
+                          step={1}
+                          disabled={isConverting}
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">
+                          左边距: {barcodeConfig.marginLeft ?? barcodeConfig.margin}px
+                        </label>
+                        <Slider
+                          value={[barcodeConfig.marginLeft ?? barcodeConfig.margin]}
+                          onValueChange={([value]) => {
+                            if (value === barcodeConfig.margin) {
+                              setBarcodeConfig(prev => {
+                                const { marginLeft, ...rest } = prev;
+                                return rest;
+                              });
+                            } else {
+                              setBarcodeConfig(prev => ({ ...prev, marginLeft: value as number }));
+                            }
+                          }}
+                          max={50}
+                          min={0}
+                          step={1}
+                          disabled={isConverting}
+                          className="w-full"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">
+                          右边距: {barcodeConfig.marginRight ?? barcodeConfig.margin}px
+                        </label>
+                        <Slider
+                          value={[barcodeConfig.marginRight ?? barcodeConfig.margin]}
+                          onValueChange={([value]) => {
+                            if (value === barcodeConfig.margin) {
+                              setBarcodeConfig(prev => {
+                                const { marginRight, ...rest } = prev;
+                                return rest;
+                              });
+                            } else {
+                              setBarcodeConfig(prev => ({ ...prev, marginRight: value as number }));
+                            }
+                          }}
+                          max={50}
+                          min={0}
+                          step={1}
+                          disabled={isConverting}
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                   {/* 格式特定选项 */}
                   <div className="space-y-4">
                     <h4 className="text-md font-medium text-gray-800">格式特定选项</h4>
@@ -678,8 +877,8 @@ export function SimpleLinkConverter() {
       {/* 选择视图 */}
       <div className="space-y-2">
         <label className="text-sm font-medium text-gray-700">
-          {t('converter.selectView')}
           <RequireCom />
+          {t('converter.selectView')}
         </label>
         <Select value={selectedViewId} onValueChange={setSelectedViewId} disabled={isConverting}>
           <SelectTrigger>
@@ -705,8 +904,8 @@ export function SimpleLinkConverter() {
       {/* 选择源字段 */}
       <div className="space-y-2">
         <label className="text-sm font-medium text-gray-700">
-          选择数据字段
           <RequireCom />
+          选择数据字段
         </label>
         <Select value={selectedUrlField} onValueChange={setSelectedUrlField} disabled={isConverting}>
           <SelectTrigger>
@@ -737,8 +936,8 @@ export function SimpleLinkConverter() {
       {/* 选择附件字段 */}
       <div className="space-y-2">
         <label className="text-sm font-medium text-gray-700">
-          {t('converter.selectAttachmentField')}
           <RequireCom />
+          {t('converter.selectAttachmentField')}
         </label>
         <Select value={selectedAttachmentField} onValueChange={setSelectedAttachmentField} disabled={isConverting}>
           <SelectTrigger>
