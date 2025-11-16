@@ -1,22 +1,33 @@
-# Teable Barcode Generator Plugin
+# Teable Barcode & QR Code Generator Plugin
 
-A powerful [Teable](https://teable.ai) plugin for generating barcodes from table data and saving them as downloadable attachments.
+A powerful [Teable](https://teable.ai) plugin for generating barcodes and QR codes from table data and saving them as downloadable attachments.
 
 ## ✨ Features
 
+### Barcode Generation
 - 📊 **Multiple Barcode Formats** - Support for 20+ barcode formats including CODE128, EAN, UPC, CODE39, ITF, MSI, and more
 - 🎨 **Customizable Appearance** - Full control over width, height, colors, margins, and text display
 - 📝 **Text Customization** - Customize font, size, style, position, and alignment of barcode text
 - 🔄 **Batch Generation** - Generate barcodes for multiple records at once
 - 👁️ **Live Preview** - Real-time preview of barcode appearance before generation
+
+### QR Code Generation
+- 🔲 **QR Code Support** - Generate QR codes with customizable error correction levels
+- 🎨 **Customizable Appearance** - Control size, foreground/background colors
+- 📐 **Error Correction Levels** - Choose from L (~7%), M (~15%), Q (~25%), H (~30%) with H recommended
+- 📁 **Multiple Formats** - Support for PNG and SVG output formats
+- 👁️ **Live Preview** - Real-time preview of QR code appearance
+
+### Common Features
 - 🎯 **Field Mapping** - Flexible selection of source data fields and target attachment fields
-- 📈 **Progress Tracking** - Real-time display of generation progress and statistics
+- 📈 **Progress Tracking** - Beautiful card-based UI showing real-time generation progress and statistics
 - 🎨 **Theme Support** - Complete light/dark mode compatibility with automatic theme detection
 - 🌍 **Internationalization** - Full i18n support (English/Chinese)
 - 📱 **Responsive Design** - Optimized for all screen sizes
 - ⚡ **Performance Optimized** - Efficient data processing with React Query
-- 🛡️ **Error Handling** - Comprehensive error reporting and user feedback
+- 🛡️ **Error Handling** - Comprehensive error reporting
 - 🔌 **Teable Integration** - Seamless integration with Teable tables and fields
+- 🎛️ **Tabbed Interface** - Easy switching between Barcode and QR Code generation modes
 
 ## 🛠️ Tech Stack
 
@@ -35,6 +46,9 @@ A powerful [Teable](https://teable.ai) plugin for generating barcodes from table
 
 ### Barcode Generation
 - **jsbarcode 3.12.1** - JavaScript barcode generation library
+
+### QR Code Generation
+- **qrcode 1.5.4** - QR code generation library
 
 ### Teable Ecosystem
 - `@teable/sdk` - Plugin bridge, UI configuration, utilities
@@ -75,13 +89,25 @@ npm start
 
 ## 📖 Usage
 
-1. **Select View** - Choose the view containing records to process
-2. **Select Data Source Field** - Choose the field containing data for barcode generation (text or number field)
-3. **Select Attachment Field** - Choose the attachment field to store generated barcodes
-4. **Configure Barcode** - Customize barcode format, appearance, and text settings
-5. **Preview** - Review the barcode appearance in real-time
-6. **Generate** - Click "Generate Barcode" to process all records
-7. **View Results** - Generated barcodes are saved as images in the attachment field
+### Barcode Generation
+1. **Switch to Barcode Tab** - Select the "Barcode" tab
+2. **Select View** - Choose the view containing records to process
+3. **Select Data Source Field** - Choose the field containing data for barcode generation (text or number field)
+4. **Select Attachment Field** - Choose the attachment field to store generated barcodes
+5. **Configure Barcode** - Customize barcode format, appearance, and text settings
+6. **Preview** - Review the barcode appearance in real-time
+7. **Generate** - Click "Generate Barcode" to process all records
+8. **View Results** - Generated barcodes are saved as images in the attachment field
+
+### QR Code Generation
+1. **Switch to QR Code Tab** - Select the "QR Code" tab
+2. **Select View** - Choose the view containing records to process
+3. **Select Data Source Field** - Choose the field containing data for QR code generation (text or number field)
+4. **Select Attachment Field** - Choose the attachment field to store generated QR codes
+5. **Configure QR Code** - Customize error correction level, size, colors, and output format
+6. **Preview** - Review the QR code appearance in real-time
+7. **Generate** - Click "Generate QR Code" to process all records
+8. **View Results** - Generated QR codes are saved as images in the attachment field
 
 ## 🔧 Configuration Options
 
@@ -123,6 +149,18 @@ npm start
 - **Uniform Margin** - Set all margins at once (0-50px)
 - **Individual Margins** - Customize top, bottom, left, and right margins separately
 
+### QR Code Settings
+
+- **Error Correction Level** - Choose from 4 levels:
+  - **L (~7%)** - Low error correction, highest capacity
+  - **M (~15%)** - Medium error correction, good balance
+  - **Q (~25%)** - Quarter error correction, better reliability
+  - **H (~30%)** - High error correction, highest reliability (Recommended)
+- **Size** - QR code size (50-512px)
+- **Foreground Color** - QR code pattern color
+- **Background Color** - QR code background color
+- **File Format** - PNG (default) or SVG output format
+
 ## 🌐 Internationalization
 
 The plugin supports the following languages:
@@ -137,14 +175,16 @@ Translation files are located in the `src/locales/` directory.
 src/
 ├── app/                 # Next.js App Router
 ├── components/          # React components
-│   ├── BarcodeGenerator.tsx  # Main barcode generator component
+│   ├── BarcodeGenerator.tsx  # Main barcode/QR code generator component
+│   ├── QRCodePreview.tsx     # QR code preview component
 │   └── ...            # Other UI components
 ├── hooks/              # React Hooks
 ├── lib/                # Utility libraries
 ├── locales/            # Internationalization files
 ├── types/              # TypeScript type definitions
 └── utils/              # Utility functions
-    └── barcodeGenerator.ts  # Barcode generation logic
+    ├── barcodeGenerator.ts  # Barcode generation logic
+    └── qrCodeGenerator.ts  # QR code generation logic
 ```
 
 ## 🔌 Teable Plugin Architecture
@@ -200,3 +240,4 @@ MIT License
 - [Teable Official Website](https://teable.ai)
 - [Next.js Documentation](https://nextjs.org/docs)
 - [JsBarcode Documentation](https://github.com/lindell/JsBarcode)
+- [QRCode.js Documentation](https://github.com/soldair/node-qrcode)
