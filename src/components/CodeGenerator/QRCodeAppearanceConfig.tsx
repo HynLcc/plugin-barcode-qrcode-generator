@@ -51,7 +51,7 @@ export function QRCodeAppearanceConfig({
       <Card>
         <CollapsibleTrigger asChild>
           <CardHeader className="cursor-pointer hover:bg-muted transition-colors">
-            <CardTitle className="flex items-center justify-between text-sm">
+            <CardTitle className="flex items-center justify-between text-sm font-semibold">
               <div className="flex items-center gap-2">
                 <Settings className="w-5 h-5" />
                 {t('barcode.appearancePreview')}
