@@ -29,7 +29,6 @@ import {
   TabsTrigger,
   TabsContent,
 } from '@teable/ui-lib/shadcn';
-import { toast } from 'sonner';
 import {
   AlertCircle,
   Sheet,
@@ -206,13 +205,13 @@ export function BarcodeGenerator() {
 
   // QR码配置状态
   const [qrConfig, setQrConfig] = useState<IQRCodeOptions>({
-    errorCorrectionLevel: QRErrorCorrectionLevel.M,
+    errorCorrectionLevel: QRErrorCorrectionLevel.H,
     width: 256,
     color: {
       dark: '#000000',
       light: '#FFFFFF'
     },
-    type: 'svg'
+    type: 'png'
   });
 
   // 清理定时器的 useEffect
@@ -447,14 +446,10 @@ export function BarcodeGenerator() {
   // 生成条形码并上传的转换方法
   const handleBarcodeConvert = async () => {
     if (!isConfigValid) {
-      toast.error(t('barcode.configIncomplete'));
       return;
     }
 
     if (!tableId) {
-      toast.error(t('barcode.tableIdUnavailable'), {
-        description: t('barcode.cannotGetTableInfo')
-      });
       return;
     }
 
@@ -502,9 +497,6 @@ export function BarcodeGenerator() {
       const records = recordsResponse.data.records;
 
       if (!records || records.length === 0) {
-        toast.error(t('barcode.noRecordsToProcess'), {
-          description: t('barcode.noRecordsInView')
-        });
         setIsConverting(false);
         return;
       }
@@ -600,17 +592,8 @@ export function BarcodeGenerator() {
         setProgress(((i + 1) / totalRecords) * 100);
       }
 
-      // 显示成功消息（使用局部变量successCount而不是stats.success）
-      toast.success(t('barcode.conversionCompleted'), {
-        description: t('barcode.barcodesGenerated', { total: totalItems, success: successCount })
-      });
-
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('Barcode conversion error:', error);
-      toast.error(t('barcode.conversionFailed'), {
-        description: `${t('barcode.errorDuringConversion')}: ${errorMessage}`
-      });
     } finally {
       setIsConverting(false);
       setStats(prev => ({ ...prev, processing: 0 }));
@@ -626,14 +609,10 @@ export function BarcodeGenerator() {
   // QR码生成并上传的转换方法
   const handleQRCodeConvert = async () => {
     if (!isConfigValid) {
-      toast.error(t('barcode.configIncomplete'));
       return;
     }
 
     if (!tableId) {
-      toast.error(t('barcode.tableIdUnavailable'), {
-        description: t('barcode.cannotGetTableInfo')
-      });
       return;
     }
 
@@ -676,9 +655,6 @@ export function BarcodeGenerator() {
       const records = recordsResponse.data.records;
 
       if (!records || records.length === 0) {
-        toast.error(t('barcode.noRecordsToProcess'), {
-          description: t('barcode.noRecordsInView')
-        });
         setIsConverting(false);
         return;
       }
@@ -717,12 +693,12 @@ export function BarcodeGenerator() {
           const qrResult: IQRCodeResult = await generateQRCode(
             encodeText,
             qrConfig,
-            `qrcode_${record.id}_${Date.now()}.${qrConfig.type || 'svg'}`
+            `qrcode_${record.id}_${Date.now()}.${qrConfig.type || 'png'}`
           );
 
           if (qrResult.success && qrResult.blob) {
             const formData = new FormData();
-            formData.append('file', qrResult.blob, qrResult.fileName || `qrcode.${qrConfig.type || 'svg'}`);
+            formData.append('file', qrResult.blob, qrResult.fileName || `qrcode.${qrConfig.type || 'png'}`);
 
             const apiUrl = `/table/${tableId}/record/${record.id}/${selectedAttachmentField}/uploadAttachment`;
 
@@ -756,16 +732,8 @@ export function BarcodeGenerator() {
         setProgress(((i + 1) / totalRecords) * 100);
       }
 
-      toast.success(t('barcode.conversionCompleted'), {
-        description: t('barcode.barcodesGenerated', { total: totalItems, success: successCount })
-      });
-
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       console.error('QR code conversion error:', error);
-      toast.error(t('barcode.conversionFailed'), {
-        description: `${t('barcode.errorDuringConversion')}: ${errorMessage}`
-      });
     } finally {
       setIsConverting(false);
       setStats(prev => ({ ...prev, processing: 0 }));
@@ -816,7 +784,7 @@ export function BarcodeGenerator() {
     <div className="w-full max-w-2xl mx-auto p-6 space-y-4">
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'barcode' | 'qrcode')}>
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="barcode">{t('barcode.barcodeType')}</TabsTrigger>
+          <TabsTrigger value="barcode">{t('barcode.barcodeTabLabel')}</TabsTrigger>
           <TabsTrigger value="qrcode">{t('qrcode.qrcodeType')}</TabsTrigger>
         </TabsList>
 
@@ -1640,7 +1608,7 @@ export function BarcodeGenerator() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground">{t('qrcode.errorCorrectionLevel')}</label>
                     <Select
-                      value={qrConfig.errorCorrectionLevel || QRErrorCorrectionLevel.M}
+                      value={qrConfig.errorCorrectionLevel || QRErrorCorrectionLevel.H}
                       onValueChange={(value) => setQrConfig(prev => ({ ...prev, errorCorrectionLevel: value as QRErrorCorrectionLevel }))}
                       disabled={isConverting}
                     >
@@ -1650,9 +1618,11 @@ export function BarcodeGenerator() {
                       <SelectContent>
                         {supportedErrorCorrectionLevels.map((level) => (
                           <SelectItem key={level.value} value={level.value}>
-                            <div className="flex flex-col">
+                            <div className="flex items-center gap-2">
                               <span>{level.label}</span>
-                              <span className="text-xs text-muted-foreground">{level.description}</span>
+                              {level.value === QRErrorCorrectionLevel.H && (
+                                <span className="text-xs text-primary font-medium">{t('qrcode.recommended')}</span>
+                              )}
                             </div>
                           </SelectItem>
                         ))}
@@ -1664,7 +1634,7 @@ export function BarcodeGenerator() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground">{t('barcode.fileFormat')}</label>
                     <Select
-                      value={qrConfig.type || 'svg'}
+                      value={qrConfig.type || 'png'}
                       onValueChange={(value) => setQrConfig(prev => ({ ...prev, type: value as 'svg' | 'png' }))}
                       disabled={isConverting}
                     >
@@ -1838,13 +1808,13 @@ export function BarcodeGenerator() {
                         size="sm"
                         onClick={() => {
                           setQrConfig({
-                            errorCorrectionLevel: QRErrorCorrectionLevel.M,
+                            errorCorrectionLevel: QRErrorCorrectionLevel.H,
                             width: 256,
                             color: {
                               dark: '#000000',
                               light: '#FFFFFF'
                             },
-                            type: 'svg'
+                            type: 'png'
                           });
                         }}
                         disabled={isConverting}
@@ -1854,11 +1824,11 @@ export function BarcodeGenerator() {
                       </Button>
                     </div>
                     <QRCodePreview
-                      value="Hello123"
+                      value="teable.ai"
                       size={qrConfig.width || 256}
                       fgColor={qrConfig.color?.dark || '#000000'}
                       bgColor={qrConfig.color?.light || '#FFFFFF'}
-                      level={qrConfig.errorCorrectionLevel || QRErrorCorrectionLevel.M}
+                      level={qrConfig.errorCorrectionLevel || QRErrorCorrectionLevel.H}
                       includeMargin={true}
                     />
                   </div>
@@ -1872,24 +1842,59 @@ export function BarcodeGenerator() {
       {/* 第三部分：转换进度和生成按钮（两个Tab共用） */}
       {(isConverting || stats.success > 0 || stats.failed > 0) && (
         <Card>
-          <CardContent className="space-y-4">
-            <div className="space-y-3 p-4 border rounded-lg bg-muted">
-              <div className="text-sm font-medium text-foreground flex items-center gap-1">
-                {t('barcode.generationProgress')}
+          <CardContent className="pt-6">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Settings className="w-4 h-4 text-muted-foreground" />
+                <h3 className="text-sm font-semibold text-foreground">{t('barcode.generationProgress')}</h3>
               </div>
+              
               {isConverting && (
                 <div className="space-y-2">
-                  <div className="flex justify-between text-[13px] text-muted-foreground mb-1">
-                    <span>{t('barcode.progress')}</span>
-                    <span>{Math.round(progress)}%</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">{t('barcode.progress')}</span>
+                    <span className="text-sm font-medium text-foreground">{Math.round(progress)}%</span>
                   </div>
                   <Progress value={progress} className="h-2" />
                 </div>
               )}
-              <div className="flex gap-6 text-[13px]">
-                <span className="text-green-600 dark:text-green-400">{t('barcode.successful')}: {stats.success}{t('barcode.countUnit')}</span>
-                {stats.failed > 0 && <span className="text-red-600 dark:text-red-400">{t('barcode.failed')}: {stats.failed}{t('barcode.countUnit')}</span>}
-                {stats.processing > 0 && <span className="text-blue-600 dark:text-blue-400">{t('barcode.processing')}: {stats.processing}{t('barcode.countUnit')}</span>}
+              
+              <div className="grid grid-cols-3 gap-3">
+                {stats.success > 0 && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/30">
+                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-muted-foreground">{t('barcode.successful')}</div>
+                      <div className="text-base font-semibold text-green-600 dark:text-green-400">
+                        {stats.success}{t('barcode.countUnit')}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {stats.failed > 0 && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/30">
+                    <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-muted-foreground">{t('barcode.failed')}</div>
+                      <div className="text-base font-semibold text-red-600 dark:text-red-400">
+                        {stats.failed}{t('barcode.countUnit')}
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {stats.processing > 0 && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/30">
+                    <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs text-muted-foreground">{t('barcode.processing')}</div>
+                      <div className="text-base font-semibold text-blue-600 dark:text-blue-400">
+                        {stats.processing}{t('barcode.countUnit')}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>

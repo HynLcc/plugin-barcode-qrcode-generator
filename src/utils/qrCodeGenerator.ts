@@ -54,14 +54,14 @@ export interface IQRCodeResult {
  * 默认QR码选项
  */
 const DEFAULT_QRCODE_OPTIONS: Required<Omit<IQRCodeOptions, 'type'>> & { type: 'svg' | 'png' } = {
-  errorCorrectionLevel: QRErrorCorrectionLevel.M,
+  errorCorrectionLevel: QRErrorCorrectionLevel.H,
   width: 256,
   color: {
     dark: '#000000',
     light: '#FFFFFF'
   },
   margin: 4,
-  type: 'svg'
+  type: 'png'
 };
 
 /**
@@ -116,7 +116,7 @@ export class QRCodeGenerator {
       if (type === 'svg') {
         // 生成 SVG 格式
         const svgString = await QRCode.toString(data, {
-          errorCorrectionLevel: errorCorrectionLevel || 'M',
+          errorCorrectionLevel: errorCorrectionLevel || 'H',
           width: width || 256,
           margin: margin ?? 4,
           color: {
@@ -138,7 +138,7 @@ export class QRCodeGenerator {
         // 生成 PNG 格式
         return new Promise<IQRCodeResult>((resolve, reject) => {
           QRCode.toDataURL(data, {
-            errorCorrectionLevel: errorCorrectionLevel || 'M',
+            errorCorrectionLevel: errorCorrectionLevel || 'H',
             width: width || 256,
             margin: margin ?? 4,
             color: {
@@ -168,8 +168,8 @@ export class QRCodeGenerator {
               result.fileName = finalFileName;
               result.fileSize = blob.size;
               result.duration = Date.now() - startTime;
-              result.errorCorrectionLevel = errorCorrectionLevel;
-              result.size = width;
+              result.errorCorrectionLevel = errorCorrectionLevel || QRErrorCorrectionLevel.H;
+              result.size = width || 256;
 
               resolve(result);
             } catch (fetchError) {
@@ -188,8 +188,8 @@ export class QRCodeGenerator {
       result.fileName = finalFileName;
       result.fileSize = blob.size;
       result.duration = Date.now() - startTime;
-      result.errorCorrectionLevel = errorCorrectionLevel;
-      result.size = width;
+      result.errorCorrectionLevel = errorCorrectionLevel || QRErrorCorrectionLevel.H;
+      result.size = width || 256;
 
       return result;
     } catch (error) {
@@ -257,28 +257,23 @@ export class QRCodeGenerator {
   static getSupportedErrorCorrectionLevels(): Array<{
     value: QRErrorCorrectionLevel;
     label: string;
-    description: string;
   }> {
     return [
       {
         value: QRErrorCorrectionLevel.L,
-        label: 'L (低)',
-        description: '~7% 纠错，最高容量'
+        label: '~7%'
       },
       {
         value: QRErrorCorrectionLevel.M,
-        label: 'M (中)',
-        description: '~15% 纠错，良好平衡'
+        label: '~15%'
       },
       {
         value: QRErrorCorrectionLevel.Q,
-        label: 'Q (四分之一)',
-        description: '~25% 纠错，更好可靠性'
+        label: '~25%'
       },
       {
         value: QRErrorCorrectionLevel.H,
-        label: 'H (高)',
-        description: '~30% 纠错，最高可靠性'
+        label: '~30%'
       }
     ];
   }

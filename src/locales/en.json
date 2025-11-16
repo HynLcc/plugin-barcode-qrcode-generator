@@ -7,6 +7,7 @@
     "formatSpecific": "Specific Options",
 
     "barcodeType": "Barcode Type",
+    "barcodeTabLabel": "Barcode",
     "selectBarcodeType": "Select barcode type",
     "fileFormat": "File Format",
     "selectFileFormat": "Select file format",
@@ -96,6 +97,7 @@
     "qrcodeType": "QR Code",
     "errorCorrectionLevel": "Error Correction Level",
     "selectErrorCorrectionLevel": "Select error correction level",
+    "recommended": "Recommended",
     "size": "Size",
     "foregroundColor": "Foreground Color",
     "backgroundColor": "Background Color",

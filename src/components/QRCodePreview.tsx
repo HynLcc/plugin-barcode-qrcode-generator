@@ -34,7 +34,7 @@ export const QRCodePreview: React.FC<QRCodePreviewProps> = ({
   size = 256,
   fgColor = '#000000',
   bgColor = '#FFFFFF',
-  level = QRErrorCorrectionLevel.M,
+  level = QRErrorCorrectionLevel.H,
   includeMargin = true,
   className
 }) => {
@@ -55,7 +55,7 @@ export const QRCodePreview: React.FC<QRCodePreviewProps> = ({
 
       try {
         const qrOptions = {
-          errorCorrectionLevel: level || 'M',
+          errorCorrectionLevel: level || 'H',
           width: size,
           margin: includeMargin ? 4 : 0,
           color: {

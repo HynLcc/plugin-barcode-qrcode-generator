@@ -8,7 +8,6 @@ import { ThemeProvider } from '@teable/next-themes';
 import { IUIConfig, usePluginBridge } from '@teable/sdk';
 import { useInitApi } from '@/hooks/useInitApi';
 import { useEffect, useState } from 'react';
-import { Toaster } from 'sonner';
 
 /**
  * Main application component that sets up the plugin environment with theme support,
@@ -73,13 +72,6 @@ export default function Main({ theme }: { theme: 'light' | 'dark' }) {
         <ErrorBoundary onError={handleError}>
           <BarcodeGenerator />
         </ErrorBoundary>
-        <Toaster
-          theme={(uiConfig?.theme as 'light' | 'dark' | 'system') ?? theme}
-          position="bottom-left"
-          expand={false}
-          richColors
-          closeButton
-        />
       </QueryClientProvider>
     </ThemeProvider>
   );
