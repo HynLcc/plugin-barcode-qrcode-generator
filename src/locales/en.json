@@ -92,6 +92,15 @@
     "processing": "Processing",
     "countUnit": ""
   },
+  "qrcode": {
+    "qrcodeType": "QR Code",
+    "errorCorrectionLevel": "Error Correction Level",
+    "selectErrorCorrectionLevel": "Select error correction level",
+    "size": "Size",
+    "foregroundColor": "Foreground Color",
+    "backgroundColor": "Background Color",
+    "generateQRCode": "Generate QR Code"
+  },
   "common": {
     "cancel": "Cancel",
     "confirm": "Confirm",

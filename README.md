@@ -137,7 +137,7 @@ Translation files are located in the `src/locales/` directory.
 src/
 ├── app/                 # Next.js App Router
 ├── components/          # React components
-│   ├── SimpleLinkConverter.tsx  # Main barcode generator component
+│   ├── BarcodeGenerator.tsx  # Main barcode generator component
 │   └── ...            # Other UI components
 ├── hooks/              # React Hooks
 ├── lib/                # Utility libraries

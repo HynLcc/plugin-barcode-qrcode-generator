@@ -34,7 +34,9 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@teable/ui-lib/shadcn": ["./node_modules/@teable/ui-lib/dist/shadcn/index"],
+      "@teable/ui-lib/shadcn/*": ["./node_modules/@teable/ui-lib/dist/shadcn/*"]
     },
     "types": ["node", "@types/estree", "@types/estree-jsx"]
   },

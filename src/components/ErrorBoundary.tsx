@@ -1,8 +1,7 @@
 'use client';
 import { ReactNode, Component, ErrorInfo, ReactElement } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
-import { Button } from '@teable/ui-lib/dist/shadcn/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@teable/ui-lib/dist/shadcn/ui/card';
+import { Button, Card, CardContent, CardHeader, CardTitle } from '@teable/ui-lib/shadcn';
 
 interface IErrorBoundaryProps {
   children: ReactNode;

@@ -92,6 +92,15 @@
     "processing": "处理中",
     "countUnit": "个"
   },
+  "qrcode": {
+    "qrcodeType": "二维码",
+    "errorCorrectionLevel": "错误纠正级别",
+    "selectErrorCorrectionLevel": "选择错误纠正级别",
+    "size": "尺寸",
+    "foregroundColor": "二维码颜色",
+    "backgroundColor": "背景颜色",
+    "generateQRCode": "生成二维码"
+  },
   "common": {
     "cancel": "取消",
     "confirm": "确认",

@@ -5,15 +5,30 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { usePluginBridge } from '@teable/sdk';
 import { setAuthToken } from '@/lib/api';
-import { Button } from '@teable/ui-lib/dist/shadcn/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@teable/ui-lib/dist/shadcn/ui/select';
-import { Progress } from '@teable/ui-lib/dist/shadcn/ui/progress';
-import { Card, CardContent, CardHeader, CardTitle } from '@teable/ui-lib/dist/shadcn/ui/card';
-import { Separator } from '@teable/ui-lib/dist/shadcn/ui/separator';
-import { Slider } from '@teable/ui-lib/dist/shadcn/ui/slider';
-import { Switch } from '@teable/ui-lib/dist/shadcn/ui/switch';
-import { Input } from '@teable/ui-lib/dist/shadcn/ui/input';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@teable/ui-lib/dist/shadcn/ui/collapsible';
+import {
+  Button,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Progress,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Separator,
+  Slider,
+  Switch,
+  Input,
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  TabsContent,
+} from '@teable/ui-lib/shadcn';
 import { toast } from 'sonner';
 import {
   AlertCircle,
@@ -32,7 +47,9 @@ import {
 } from '@teable/icons';
 import * as openApi from '@teable/openapi';
 import { axios } from '@teable/openapi';
-import { generateBarcode, BarcodeFormat, OutputFormat, IBarcodeResult, BarcodeGenerator } from '@/utils/barcodeGenerator';
+import { generateBarcode, BarcodeFormat, OutputFormat, IBarcodeResult, BarcodeGenerator as BarcodeGeneratorClass } from '@/utils/barcodeGenerator';
+import { generateQRCode, QRErrorCorrectionLevel, IQRCodeOptions, IQRCodeResult, QRCodeGenerator } from '@/utils/qrCodeGenerator';
+import { QRCodePreview } from '@/components/QRCodePreview';
 import { useViews } from '@/hooks/useViews';
 import { useGlobalUrlParams } from '@/hooks/useGlobalUrlParams';
 import { IView } from '@/types';
@@ -125,13 +142,19 @@ interface IConversionResult {
   errors: string[];
 }
 
-export function SimpleLinkConverter() {
+export function BarcodeGenerator() {
   const { t } = useTranslation('common');
   const { tableId } = useGlobalUrlParams();
   const bridge = usePluginBridge();
 
+  // Tab切换状态
+  const [activeTab, setActiveTab] = useState<'barcode' | 'qrcode'>('barcode');
+
   // 获取支持的条形码格式列表
-  const supportedFormats = BarcodeGenerator.getSupportedFormats();
+  const supportedFormats = BarcodeGeneratorClass.getSupportedFormats();
+  
+  // 获取支持的错误纠正级别列表
+  const supportedErrorCorrectionLevels = QRCodeGenerator.getSupportedErrorCorrectionLevels();
 
   // Token 刷新定时器引用
   const tokenRefreshTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -179,6 +202,17 @@ export function SimpleLinkConverter() {
     // 特定格式选项的默认值
     ean128: false,
     flat: false
+  });
+
+  // QR码配置状态
+  const [qrConfig, setQrConfig] = useState<IQRCodeOptions>({
+    errorCorrectionLevel: QRErrorCorrectionLevel.M,
+    width: 256,
+    color: {
+      dark: '#000000',
+      light: '#FFFFFF'
+    },
+    type: 'svg'
   });
 
   // 清理定时器的 useEffect
@@ -589,9 +623,167 @@ export function SimpleLinkConverter() {
     }
   };
 
-  // 条形码转换处理方法
+  // QR码生成并上传的转换方法
+  const handleQRCodeConvert = async () => {
+    if (!isConfigValid) {
+      toast.error(t('barcode.configIncomplete'));
+      return;
+    }
+
+    if (!tableId) {
+      toast.error(t('barcode.tableIdUnavailable'), {
+        description: t('barcode.cannotGetTableInfo')
+      });
+      return;
+    }
+
+    setIsConverting(true);
+    setProgress(0);
+    setStats({ success: 0, failed: 0, processing: 0 });
+
+    try {
+      // 在开始转换前，重新获取临时token，确保token是最新的
+      if (bridge) {
+        try {
+          const tokenResponse = await bridge.getSelfTempToken();
+          setAuthToken(tokenResponse.accessToken);
+        } catch (error) {
+          console.error('Failed to refresh token before conversion:', error);
+        }
+      }
+
+      // 设置定期刷新token的定时器
+      if (bridge) {
+        if (tokenRefreshTimerRef.current) {
+          clearInterval(tokenRefreshTimerRef.current);
+        }
+
+        tokenRefreshTimerRef.current = setInterval(async () => {
+          try {
+            const tokenResponse = await bridge.getSelfTempToken();
+            setAuthToken(tokenResponse.accessToken);
+          } catch (error) {
+            console.error('Failed to refresh token during conversion:', error);
+          }
+        }, 8 * 60 * 1000);
+      }
+
+      // 获取记录
+      const recordsResponse = await openApi.getRecords(tableId, {
+        viewId: selectedViewId,
+        fieldKeyType: 'id' as any
+      });
+      const records = recordsResponse.data.records;
+
+      if (!records || records.length === 0) {
+        toast.error(t('barcode.noRecordsToProcess'), {
+          description: t('barcode.noRecordsInView')
+        });
+        setIsConverting(false);
+        return;
+      }
+
+      const results: IConversionResult[] = [];
+      const totalRecords = records.length;
+      let totalItems = 0;
+      let successCount = 0;
+
+      for (let i = 0; i < records.length; i++) {
+        const record = records[i];
+        if (!record) continue;
+
+        // 获取数据内容（支持文本和数字）
+        const fieldValue = record.fields[selectedUrlField];
+        const text = fieldValue != null ? String(fieldValue) : '';
+
+        if (!text || text.trim().length === 0) {
+          continue;
+        }
+
+        totalItems += 1;
+        setStats(prev => ({ ...prev, processing: prev.processing + 1 }));
+
+        const result: IConversionResult = {
+          recordId: record.id,
+          urlCount: 1,
+          successCount: 0,
+          failedUrls: [],
+          errors: []
+        };
+
+        try {
+          const encodeText = text.trim();
+
+          const qrResult: IQRCodeResult = await generateQRCode(
+            encodeText,
+            qrConfig,
+            `qrcode_${record.id}_${Date.now()}.${qrConfig.type || 'svg'}`
+          );
+
+          if (qrResult.success && qrResult.blob) {
+            const formData = new FormData();
+            formData.append('file', qrResult.blob, qrResult.fileName || `qrcode.${qrConfig.type || 'svg'}`);
+
+            const apiUrl = `/table/${tableId}/record/${record.id}/${selectedAttachmentField}/uploadAttachment`;
+
+            const uploadResponse = await axios.post(apiUrl, formData);
+
+            if (uploadResponse.data) {
+              result.successCount = 1;
+              successCount += 1;
+              updateStats('success');
+            } else {
+              result.failedUrls.push(text);
+              result.errors.push('Upload failed: No response data');
+              updateStats('failed');
+            }
+          } else {
+            result.failedUrls.push(text);
+            result.errors.push(qrResult.error || 'QR code generation failed');
+            updateStats('failed');
+          }
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          result.failedUrls.push(text);
+          result.errors.push(errorMessage);
+          updateStats('failed');
+        }
+
+        if (result.urlCount > 0) {
+          results.push(result);
+        }
+
+        setProgress(((i + 1) / totalRecords) * 100);
+      }
+
+      toast.success(t('barcode.conversionCompleted'), {
+        description: t('barcode.barcodesGenerated', { total: totalItems, success: successCount })
+      });
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('QR code conversion error:', error);
+      toast.error(t('barcode.conversionFailed'), {
+        description: `${t('barcode.errorDuringConversion')}: ${errorMessage}`
+      });
+    } finally {
+      setIsConverting(false);
+      setStats(prev => ({ ...prev, processing: 0 }));
+
+      if (tokenRefreshTimerRef.current) {
+        clearInterval(tokenRefreshTimerRef.current);
+        tokenRefreshTimerRef.current = null;
+      }
+    }
+  };
+
+  // 转换处理方法（根据当前Tab调用不同的生成函数）
   const handleConvert = async () => {
-    return handleBarcodeConvert();
+    if (activeTab === 'barcode') {
+      return handleBarcodeConvert();
+    } else {
+      return handleQRCodeConvert();
+    }
   };
 
   if (!tableId) {
@@ -622,8 +814,16 @@ export function SimpleLinkConverter() {
 
   return (
     <div className="w-full max-w-2xl mx-auto p-6 space-y-4">
-        {/* 第一部分：基础配置（条形码格式、输出格式、数据源） */}
-        <Collapsible open={isBasicConfigOpen} onOpenChange={setIsBasicConfigOpen}>
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'barcode' | 'qrcode')}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="barcode">{t('barcode.barcodeType')}</TabsTrigger>
+          <TabsTrigger value="qrcode">{t('qrcode.qrcodeType')}</TabsTrigger>
+        </TabsList>
+
+        {/* 条形码Tab */}
+        <TabsContent value="barcode" className="space-y-4 mt-4">
+          {/* 第一部分：基础配置（条形码格式、输出格式、数据源） */}
+          <Collapsible open={isBasicConfigOpen} onOpenChange={setIsBasicConfigOpen}>
           <Card>
             <CollapsibleTrigger asChild>
               <CardHeader className="cursor-pointer hover:bg-muted transition-colors">
@@ -1412,49 +1612,306 @@ export function SimpleLinkConverter() {
           </Card>
         </Collapsible>
 
-        {/* 第三部分：转换进度和生成按钮 */}
-        {(isConverting || stats.success > 0 || stats.failed > 0) && (
-          <Card>
-            <CardContent className="space-y-4">
-              <div className="space-y-3 p-4 border rounded-lg bg-muted">
-                <div className="text-sm font-medium text-foreground flex items-center gap-1">
-                  {t('barcode.generationProgress')}
-                </div>
-                {isConverting && (
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-[13px] text-muted-foreground mb-1">
-                      <span>{t('barcode.progress')}</span>
-                      <span>{Math.round(progress)}%</span>
-                    </div>
-                    <Progress value={progress} className="h-2" />
-                  </div>
-                )}
-                <div className="flex gap-6 text-[13px]">
-                  <span className="text-green-600 dark:text-green-400">{t('barcode.successful')}: {stats.success}{t('barcode.countUnit')}</span>
-                  {stats.failed > 0 && <span className="text-red-600 dark:text-red-400">{t('barcode.failed')}: {stats.failed}{t('barcode.countUnit')}</span>}
-                  {stats.processing > 0 && <span className="text-blue-600 dark:text-blue-400">{t('barcode.processing')}: {stats.processing}{t('barcode.countUnit')}</span>}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        </TabsContent>
 
-        {/* 开始生成条形码按钮 */}
-        <Button
-          onClick={handleConvert}
-          disabled={!isConfigValid || isConverting}
-          className="w-full"
-          size="lg"
-        >
-          {isConverting ? (
-            <>
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground mr-2"></div>
-              {t('barcode.generating')}
-            </>
-          ) : (
-            t('barcode.generateBarcode')
-          )}
-        </Button>
+        {/* QR码Tab */}
+        <TabsContent value="qrcode" className="space-y-4 mt-4">
+          {/* 第一部分：基础配置（错误纠正级别、输出格式、数据源） */}
+          <Collapsible open={isBasicConfigOpen} onOpenChange={setIsBasicConfigOpen}>
+            <Card>
+              <CollapsibleTrigger asChild>
+                <CardHeader className="cursor-pointer hover:bg-muted transition-colors">
+                  <CardTitle className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <Settings className="w-5 h-5" />
+                      {t('barcode.basicSettings')}
+                    </div>
+                    {isBasicConfigOpen ? (
+                      <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                    )}
+                  </CardTitle>
+                </CardHeader>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="space-y-4">
+                  {/* 错误纠正级别 */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">{t('qrcode.errorCorrectionLevel')}</label>
+                    <Select
+                      value={qrConfig.errorCorrectionLevel || QRErrorCorrectionLevel.M}
+                      onValueChange={(value) => setQrConfig(prev => ({ ...prev, errorCorrectionLevel: value as QRErrorCorrectionLevel }))}
+                      disabled={isConverting}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={t('qrcode.selectErrorCorrectionLevel')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {supportedErrorCorrectionLevels.map((level) => (
+                          <SelectItem key={level.value} value={level.value}>
+                            <div className="flex flex-col">
+                              <span>{level.label}</span>
+                              <span className="text-xs text-muted-foreground">{level.description}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* 输出格式 */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">{t('barcode.fileFormat')}</label>
+                    <Select
+                      value={qrConfig.type || 'svg'}
+                      onValueChange={(value) => setQrConfig(prev => ({ ...prev, type: value as 'svg' | 'png' }))}
+                      disabled={isConverting}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={t('barcode.selectFileFormat')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="svg">SVG</SelectItem>
+                        <SelectItem value="png">PNG</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* 数据源配置（与条形码Tab共用） */}
+                  <div className="space-y-4">
+                    {/* 选择视图 */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        <RequireCom />
+                        {t('barcode.selectView')}
+                      </label>
+                      <Select value={selectedViewId} onValueChange={setSelectedViewId} disabled={isConverting}>
+                        <SelectTrigger>
+                          <SelectValue placeholder={t('barcode.selectViewPlaceholder')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {viewsArray.length === 0 ? (
+                            <SelectItem value="no-views" disabled>{t('barcode.noViewsFound')}</SelectItem>
+                          ) : (
+                            viewsArray.map((view) => (
+                              <SelectItem key={view.id} value={view.id}>
+                                <div className="flex items-center gap-2">
+                                  {getViewIcon(view.type)}
+                                  <span>{view.name}</span>
+                                </div>
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* 选择源字段 */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        <RequireCom />
+                        {t('barcode.dataSourceField')}
+                      </label>
+                      <Select value={selectedUrlField} onValueChange={setSelectedUrlField} disabled={isConverting}>
+                        <SelectTrigger>
+                          <SelectValue placeholder={t('barcode.selectFieldPlaceholder')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sourceFields.length === 0 ? (
+                            <SelectItem value="no-fields" disabled>
+                              {t('barcode.noDataFieldsFound')}
+                            </SelectItem>
+                          ) : (
+                            sourceFields.map((field) => (
+                              <SelectItem key={field.id} value={field.id}>
+                                <div className="flex items-center gap-2">
+                                  {getFieldIcon(field.type, field.cellValueType)}
+                                  <span>{field.name}</span>
+                                </div>
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* 选择附件字段 */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-foreground">
+                        <RequireCom />
+                        {t('barcode.selectAttachmentField')}
+                      </label>
+                      <Select value={selectedAttachmentField} onValueChange={setSelectedAttachmentField} disabled={isConverting}>
+                        <SelectTrigger>
+                          <SelectValue placeholder={t('barcode.selectFieldPlaceholder')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {attachmentFields.length === 0 ? (
+                            <SelectItem value="no-fields" disabled>{t('barcode.noAttachmentFieldsFound')}</SelectItem>
+                          ) : (
+                            attachmentFields.map((field) => (
+                              <SelectItem key={field.id} value={field.id}>
+                                <div className="flex items-center gap-2">
+                                  <File className="w-4 h-4" />
+                                  <span>{field.name}</span>
+                                </div>
+                              </SelectItem>
+                            ))
+                          )}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
+
+          {/* 第二部分：外观与预览 */}
+          <Collapsible open={isOptionsPreviewOpen} onOpenChange={setIsOptionsPreviewOpen}>
+            <Card>
+              <CollapsibleTrigger asChild>
+                <CardHeader className="cursor-pointer hover:bg-muted transition-colors">
+                  <CardTitle className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <Settings className="w-5 h-5" />
+                      {t('barcode.appearancePreview')}
+                    </div>
+                    {isOptionsPreviewOpen ? (
+                      <ChevronUp className="w-5 h-5 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="w-5 h-5 text-muted-foreground" />
+                    )}
+                  </CardTitle>
+                </CardHeader>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="space-y-4">
+                  {/* 尺寸设置 */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">{t('qrcode.size')}: {qrConfig.width}px</label>
+                    <Slider
+                      value={[qrConfig.width || 256]}
+                      onValueChange={([value]) => setQrConfig(prev => ({ ...prev, width: value as number }))}
+                      max={512}
+                      min={50}
+                      step={10}
+                      disabled={isConverting}
+                      className="w-full"
+                    />
+                  </div>
+
+                  {/* 颜色设置 */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={qrConfig.color?.dark || '#000000'}
+                        onChange={(e) => setQrConfig(prev => ({ ...prev, color: { ...prev.color, dark: e.target.value, light: prev.color?.light || '#FFFFFF' } }))}
+                        disabled={isConverting}
+                        className="w-7 h-7 rounded border-border cursor-pointer"
+                      />
+                      <label className="text-sm font-medium text-foreground">{t('qrcode.foregroundColor')}</label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={qrConfig.color?.light || '#FFFFFF'}
+                        onChange={(e) => setQrConfig(prev => ({ ...prev, color: { ...prev.color, dark: prev.color?.dark || '#000000', light: e.target.value } }))}
+                        disabled={isConverting}
+                        className="w-7 h-7 rounded border-border cursor-pointer"
+                      />
+                      <label className="text-sm font-medium text-foreground">{t('qrcode.backgroundColor')}</label>
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  {/* 预览 */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-medium text-foreground">{t('barcode.preview')}</h4>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setQrConfig({
+                            errorCorrectionLevel: QRErrorCorrectionLevel.M,
+                            width: 256,
+                            color: {
+                              dark: '#000000',
+                              light: '#FFFFFF'
+                            },
+                            type: 'svg'
+                          });
+                        }}
+                        disabled={isConverting}
+                        className="h-7 text-xs text-muted-foreground hover:text-foreground bg-muted/80 hover:bg-muted/60"
+                      >
+                        {t('barcode.resetAllSettings')}
+                      </Button>
+                    </div>
+                    <QRCodePreview
+                      value="Hello123"
+                      size={qrConfig.width || 256}
+                      fgColor={qrConfig.color?.dark || '#000000'}
+                      bgColor={qrConfig.color?.light || '#FFFFFF'}
+                      level={qrConfig.errorCorrectionLevel || QRErrorCorrectionLevel.M}
+                      includeMargin={true}
+                    />
+                  </div>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
+        </TabsContent>
+      </Tabs>
+
+      {/* 第三部分：转换进度和生成按钮（两个Tab共用） */}
+      {(isConverting || stats.success > 0 || stats.failed > 0) && (
+        <Card>
+          <CardContent className="space-y-4">
+            <div className="space-y-3 p-4 border rounded-lg bg-muted">
+              <div className="text-sm font-medium text-foreground flex items-center gap-1">
+                {t('barcode.generationProgress')}
+              </div>
+              {isConverting && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-[13px] text-muted-foreground mb-1">
+                    <span>{t('barcode.progress')}</span>
+                    <span>{Math.round(progress)}%</span>
+                  </div>
+                  <Progress value={progress} className="h-2" />
+                </div>
+              )}
+              <div className="flex gap-6 text-[13px]">
+                <span className="text-green-600 dark:text-green-400">{t('barcode.successful')}: {stats.success}{t('barcode.countUnit')}</span>
+                {stats.failed > 0 && <span className="text-red-600 dark:text-red-400">{t('barcode.failed')}: {stats.failed}{t('barcode.countUnit')}</span>}
+                {stats.processing > 0 && <span className="text-blue-600 dark:text-blue-400">{t('barcode.processing')}: {stats.processing}{t('barcode.countUnit')}</span>}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 开始生成按钮 */}
+      <Button
+        onClick={handleConvert}
+        disabled={!isConfigValid || isConverting}
+        className="w-full"
+        size="lg"
+      >
+        {isConverting ? (
+          <>
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground mr-2"></div>
+            {t('barcode.generating')}
+          </>
+        ) : (
+          activeTab === 'barcode' ? t('barcode.generateBarcode') : t('qrcode.generateQRCode')
+        )}
+      </Button>
     </div>
   );
 }

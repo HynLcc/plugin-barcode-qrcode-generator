@@ -1,7 +1,7 @@
 'use client';
 
 import { getQueryClient } from '@/components/context/getQueryClient';
-import { SimpleLinkConverter } from '@/components/SimpleLinkConverter';
+import { BarcodeGenerator } from '@/components/BarcodeGenerator';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@teable/next-themes';
@@ -71,7 +71,7 @@ export default function Main({ theme }: { theme: 'light' | 'dark' }) {
     <ThemeProvider attribute="class" forcedTheme={uiConfig?.theme ?? theme}>
       <QueryClientProvider client={queryClient}>
         <ErrorBoundary onError={handleError}>
-          <SimpleLinkConverter />
+          <BarcodeGenerator />
         </ErrorBoundary>
         <Toaster
           theme={(uiConfig?.theme as 'light' | 'dark' | 'system') ?? theme}

@@ -137,7 +137,7 @@ npm start
 src/
 ├── app/                 # Next.js App Router
 ├── components/          # React组件
-│   ├── SimpleLinkConverter.tsx  # 主条形码生成器组件
+│   ├── BarcodeGenerator.tsx  # 主条形码生成器组件
 │   └── ...            # 其他UI组件
 ├── hooks/              # React Hooks
 ├── lib/                # 工具库
