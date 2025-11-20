@@ -57,7 +57,7 @@
     "preview": "Preview",
     "resetAllSettings": "Reset All Settings",
     "previewing": "Previewing...",
-    "previewText": "Preview Text",
+    "previewText": "Preview Data",
     "barcodePreview": "Barcode Preview",
     "adjustSettingsToSeePreview": "Adjust settings to see preview",
 
@@ -101,7 +101,10 @@
     "size": "Size",
     "foregroundColor": "Foreground Color",
     "backgroundColor": "Background Color",
-    "generateQRCode": "Generate QR Code"
+    "generateQRCode": "Generate QR Code",
+    "previewText": "Example QR Code",
+    "previewData": "Preview Data",
+    "generating": "Generating..."
   },
   "common": {
     "cancel": "Cancel",

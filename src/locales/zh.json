@@ -101,7 +101,10 @@
     "size": "大小",
     "foregroundColor": "二维码颜色",
     "backgroundColor": "背景颜色",
-    "generateQRCode": "生成二维码"
+    "generateQRCode": "生成二维码",
+    "previewText": "示例二维码",
+    "previewData": "预览数据",
+    "generating": "生成中..."
   },
   "common": {
     "cancel": "取消",

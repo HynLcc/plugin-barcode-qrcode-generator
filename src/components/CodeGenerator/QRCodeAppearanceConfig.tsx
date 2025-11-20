@@ -148,7 +148,7 @@ export function QRCodeAppearanceConfig({
                 </Button>
               </div>
               <QRCodePreview
-                value="teable.ai"
+                value="https://teable.ai"
                 size={qrConfig.width || 256}
                 fgColor={qrConfig.color?.dark || '#000000'}
                 bgColor={qrConfig.color?.light || '#FFFFFF'}

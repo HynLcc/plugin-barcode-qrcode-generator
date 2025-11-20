@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import QRCode from 'qrcode';
 import { QRErrorCorrectionLevel } from '@/utils/qrCodeGenerator';
 import { AlertCircle } from '@teable/icons';
@@ -38,6 +39,7 @@ export const QRCodePreview: React.FC<QRCodePreviewProps> = ({
   includeMargin = true,
   className
 }) => {
+  const { t } = useTranslation();
   const [svgContent, setSvgContent] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
@@ -86,7 +88,7 @@ export const QRCodePreview: React.FC<QRCodePreviewProps> = ({
     return (
       <div className={`flex flex-col items-center justify-center py-8 space-y-2 ${className || ''}`}>
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        <p className="text-[13px] text-muted-foreground">生成中...</p>
+        <p className="text-[13px] text-muted-foreground">{t('qrcode.generating')}</p>
       </div>
     );
   }
@@ -100,14 +102,7 @@ export const QRCodePreview: React.FC<QRCodePreviewProps> = ({
     );
   }
 
-  if (!svgContent) {
-    return (
-      <div className={`flex flex-col items-center justify-center py-8 ${className || ''}`}>
-        <p className="text-[13px] text-muted-foreground">请输入数据以查看预览</p>
-      </div>
-    );
-  }
-
+  
   return (
     <div className={`flex flex-col items-center space-y-3 ${className || ''}`}>
       <div className="relative p-4 bg-background border rounded-lg flex items-center justify-center overflow-hidden">
@@ -123,7 +118,7 @@ export const QRCodePreview: React.FC<QRCodePreviewProps> = ({
         />
       </div>
       <p className="text-[13px] text-muted-foreground">
-        预览数据: <span className="font-mono">{value}</span>
+        {t('qrcode.previewData')}: <span className="font-mono">{value}</span>
       </p>
     </div>
   );

@@ -1,11 +1,9 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
-import { usePluginBridge } from '@teable/sdk';
-import { setAuthToken } from '@/lib/api';
+import { useState, useCallback } from 'react';
 import * as openApi from '@teable/openapi';
-import { axios } from '@teable/openapi';
 import { generateBarcode, IBarcodeResult } from '@/utils/barcodeGenerator';
 import { getPreviewTextByFormat } from '@/utils/barcodeHelpers';
 import { BarcodeConfig, IConversionResult } from '@/types/barcodeGenerator';
+import { useEnhancedUpload } from './useEnhancedUpload';
 
 interface ConversionStats {
   success: number;
@@ -21,8 +19,7 @@ export function useBarcodeConversion(
   barcodeConfig: BarcodeConfig,
   isConfigValid: boolean
 ) {
-  const bridge = usePluginBridge();
-  const tokenRefreshTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const { uploadFile, waitForAllUploads, isUploading, pendingUploads, activeUploads } = useEnhancedUpload();
 
   const [isConverting, setIsConverting] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -64,37 +61,6 @@ export function useBarcodeConversion(
     setStats({ success: 0, failed: 0, processing: 0 });
 
     try {
-      // 在开始转换前，重新获取临时token，确保token是最新的
-      if (bridge) {
-        try {
-          const tokenResponse = await bridge.getSelfTempToken();
-          setAuthToken(tokenResponse.accessToken);
-        } catch (error) {
-          console.error('Failed to refresh token before conversion:', error);
-          // 继续执行，使用现有token
-        }
-      }
-
-      // 设置定期刷新token的定时器（每8分钟刷新一次，token有效期10分钟）
-      // 这样可以确保在长时间转换过程中token不会过期
-      if (bridge) {
-        // 清除可能存在的旧定时器
-        if (tokenRefreshTimerRef.current) {
-          clearInterval(tokenRefreshTimerRef.current);
-        }
-
-        // 每8分钟刷新一次token
-        tokenRefreshTimerRef.current = setInterval(async () => {
-          try {
-            const tokenResponse = await bridge.getSelfTempToken();
-            setAuthToken(tokenResponse.accessToken);
-          } catch (error) {
-            console.error('Failed to refresh token during conversion:', error);
-            // 刷新失败不影响转换流程，继续执行
-          }
-        }, 8 * 60 * 1000); // 8分钟 = 8 * 60 * 1000 毫秒
-      }
-
       // 获取记录
       const recordsResponse = await openApi.getRecords(tableId, {
         viewId: selectedViewId,
@@ -108,10 +74,19 @@ export function useBarcodeConversion(
       }
 
       const results: IConversionResult[] = [];
-      const totalRecords = records.length;
       let totalItems = 0;
-      let successCount = 0; // 使用局部变量跟踪成功数量
 
+      // 准备所有上传任务
+      const uploadTasks: Array<{
+        recordId: string;
+        text: string;
+        uploadTask: Promise<boolean>;
+      }> = [];
+
+      console.log('开始生成条形码并准备上传...');
+      setProgress(0); // 重置进度
+
+      // 生成所有条形码并准备上传任务
       for (let i = 0; i < records.length; i++) {
         const record = records[i];
         if (!record) continue;
@@ -160,26 +135,38 @@ export function useBarcodeConversion(
           );
 
           if (barcodeResult.success && barcodeResult.blob) {
-            // 创建FormData来上传条形码图片
-            const formData = new FormData();
-            formData.append('file', barcodeResult.blob, barcodeResult.fileName);
-
-            // 构建 API URL
-            const apiUrl = `/table/${tableId}/record/${record.id}/${selectedAttachmentField}/uploadAttachment`;
-
-            // 上传条形码图片
-            const uploadResponse = await axios.post(apiUrl, formData);
-
-            if (uploadResponse.data) {
-              result.successCount = 1;
-              successCount += 1;
-              updateStats('success');
-            } else {
+            // 创建上传任务但不立即执行
+            const uploadPromise = uploadFile({
+              tableId: tableId!,
+              recordId: record.id,
+              attachmentFieldId: selectedAttachmentField,
+              blob: barcodeResult.blob!,
+              fileName: barcodeResult.fileName!,
+            }).then((uploadResult) => {
+              if (uploadResult.success) {
+                result.successCount = 1;
+                updateStats('success');
+                return true;
+              } else {
+                result.failedUrls.push(text);
+                result.errors.push(uploadResult.error || 'Upload failed');
+                updateStats('failed');
+                return false;
+              }
+            }).catch((error) => {
+              const errorMessage =
+                error instanceof Error ? error.message : 'Unknown upload error';
               result.failedUrls.push(text);
-              result.errors.push('Upload failed: No response data');
-              console.error(`记录 ${record.id} 上传失败: 无响应数据`);
+              result.errors.push(errorMessage);
               updateStats('failed');
-            }
+              return false;
+            });
+
+            uploadTasks.push({
+              recordId: record.id,
+              text,
+              uploadTask: uploadPromise,
+            });
           } else {
             result.failedUrls.push(text);
             result.errors.push(
@@ -198,20 +185,62 @@ export function useBarcodeConversion(
         if (result.urlCount > 0) {
           results.push(result);
         }
+      }
 
-        setProgress(((i + 1) / totalRecords) * 100);
+      console.log(`准备完成，共 ${uploadTasks.length} 个文件开始上传...`);
+
+      // 执行上传任务 (进度 0-100%，只统计成功上传)
+      if (uploadTasks.length > 0) {
+        // 监听上传进度，基于成功的上传数量
+        let successfulUploads = 0;
+        const uploadProgressInterval = setInterval(() => {
+          // 进度：0-100%，基于成功数量计算
+          const successProgress = (successfulUploads / uploadTasks.length) * 100;
+          setProgress(successProgress);
+
+          // 如果所有上传都成功了，清除定时器
+          if (successfulUploads === uploadTasks.length) {
+            clearInterval(uploadProgressInterval);
+            setProgress(100);
+          }
+        }, 500);
+
+        // 开始所有上传任务
+        const uploadPromises = uploadTasks.map(async (task, index) => {
+          try {
+            const result = await task.uploadTask;
+            if (result) {
+              successfulUploads++; // 只有成功才计数
+            }
+            return result;
+          } catch (error) {
+            return false;
+          }
+        });
+
+        // 等待所有上传完成
+        await Promise.all(uploadPromises);
+
+        // 确保最终进度设置
+        clearInterval(uploadProgressInterval);
+
+        // 如果不是全部成功，进度保持当前成功比例
+        if (successfulUploads < uploadTasks.length) {
+          const finalProgress = (successfulUploads / uploadTasks.length) * 100;
+          setProgress(finalProgress);
+        } else {
+          setProgress(100);
+        }
+
+        console.log(`上传完成，成功: ${successfulUploads}/${uploadTasks.length}`);
+      } else {
+        setProgress(100); // 没有文件需要上传，直接完成
       }
     } catch (error) {
       console.error('Barcode conversion error:', error);
     } finally {
       setIsConverting(false);
       setStats((prev) => ({ ...prev, processing: 0 }));
-
-      // 转换完成，清理token刷新定时器
-      if (tokenRefreshTimerRef.current) {
-        clearInterval(tokenRefreshTimerRef.current);
-        tokenRefreshTimerRef.current = null;
-      }
     }
   }, [
     isConfigValid,
@@ -220,25 +249,20 @@ export function useBarcodeConversion(
     selectedUrlField,
     selectedAttachmentField,
     barcodeConfig,
-    bridge,
+    uploadFile,
+    waitForAllUploads,
     updateStats,
   ]);
-
-  // 清理定时器的 useEffect
-  useEffect(() => {
-    return () => {
-      if (tokenRefreshTimerRef.current) {
-        clearInterval(tokenRefreshTimerRef.current);
-        tokenRefreshTimerRef.current = null;
-      }
-    };
-  }, []);
 
   return {
     isConverting,
     progress,
     stats,
     handleBarcodeConvert,
+    // 队列状态信息
+    isUploading,
+    pendingUploads,
+    activeUploads,
   };
 }
 

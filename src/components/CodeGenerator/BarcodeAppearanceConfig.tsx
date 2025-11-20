@@ -404,10 +404,6 @@ export function BarcodeAppearanceConfig({
                   onValueChange={([value]) => {
                     handleConfigChange({
                       margin: value as number,
-                      marginTop: undefined,
-                      marginBottom: undefined,
-                      marginLeft: undefined,
-                      marginRight: undefined,
                     });
                   }}
                   max={50}
