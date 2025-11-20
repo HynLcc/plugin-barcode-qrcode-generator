@@ -16,7 +16,7 @@ const resources = {
 export async function generateMetadata(): Promise<Metadata> {
 
   return {
-    title: '自动排名',
+    title: 'Barcode & QR Code Generator',
   };
 }
 

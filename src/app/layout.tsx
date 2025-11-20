@@ -3,7 +3,7 @@ import '@teable/ui-lib/dist/global.shadcn.css';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Todo List',
+  title: 'Barcode & QR Code Generator',
 };
 
 export default async function RootLayout({

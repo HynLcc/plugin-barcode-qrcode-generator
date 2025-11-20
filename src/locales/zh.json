@@ -110,5 +110,10 @@
     "cancel": "取消",
     "confirm": "确认",
     "attachmentField": "附件字段"
+  },
+  "errors": {
+    "errorOccurred": "出现错误",
+    "errorMessage": "抱歉，应用程序遇到了一个意外错误。请尝试刷新页面或联系技术支持。",
+    "retry": "重试"
   }
 }

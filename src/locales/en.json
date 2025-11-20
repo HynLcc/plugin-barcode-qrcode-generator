@@ -110,5 +110,10 @@
     "cancel": "Cancel",
     "confirm": "Confirm",
     "attachmentField": "Attachment Field"
+  },
+  "errors": {
+    "errorOccurred": "An Error Occurred",
+    "errorMessage": "Sorry, the application encountered an unexpected error. Please try refreshing the page or contact technical support.",
+    "retry": "Retry"
   }
 }
