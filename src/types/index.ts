@@ -13,11 +13,10 @@ export interface IRecordData {
  */
 export interface IFieldLookupOptions {
   filter?: any;
-  // 可以根据需要添加更多查找选项属性
 }
 
 /**
- * 扩展的字段类型接口，兼容Teable SDK
+ * 统一的字段类型接口
  */
 export interface IField {
   id: string;
@@ -25,45 +24,14 @@ export interface IField {
   type: string;
   cellValueType: string;
   isLookup?: boolean;
-  isConditionalLookup?: boolean;
   isComputed?: boolean;
   isMultipleCellValue?: boolean;
-  lookupOptions?: IFieldLookupOptions;
-  // 其他可能的Teable字段属性
-  options?: any;
-  description?: string;
-  // 向后兼容的属性
+  isConditionalLookup?: boolean;
   isRollup?: boolean;
-  isFormula?: boolean;
-}
-
-/**
- * UI字段信息接口，用于组件内部字段展示
- */
-export interface IUIField {
-  id: string;
-  name: string;
-  type: string;
-  cellValueType: string;
-  isComputed: boolean;
-  isLookup: boolean;
-  isConditionalLookup: boolean;
-  isRollup: boolean;
-  isMultipleCellValue: boolean;
-  isConditionalField: boolean;
+  isConditionalField?: boolean;
   lookupOptions?: IFieldLookupOptions;
-  // 其他可选属性
   options?: any;
   description?: string;
-}
-
-/**
- * 字段选项接口
- */
-export interface IFieldOption {
-  id: string;
-  name: string;
-  type: string;
 }
 
 /**
@@ -80,34 +48,6 @@ export interface IAppError {
   details?: Record<string, unknown>;
 }
 
-
-/**
- * Toast 通知类型
- */
-export type ToastType = 'success' | 'error' | 'warning' | 'info';
-
-/**
- * 组件 Props 类型
- */
-export interface IBaseComponentProps {
-  disabled?: boolean;
-  className?: string;
-}
-
-/**
- * 选择器组件 Props 类型
- */
-export interface ISelectorProps<T = string> extends IBaseComponentProps {
-  value?: T;
-  onValueChange: (value: T) => void;
-  placeholder?: string;
-  options: Array<{
-    value: T;
-    label: string;
-    disabled?: boolean;
-  }>;
-}
-
 /**
  * URL 参数类型
  */
@@ -119,7 +59,7 @@ export interface IUrlParams {
   positionType: string;
   pluginId: string;
   theme: 'light' | 'dark';
-  tableId?: string; // 在实际使用中 tableId 是必需的
+  tableId?: string;
   viewId?: string;
   dashboardId?: string;
   recordId?: string;
